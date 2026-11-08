@@ -32,3 +32,12 @@ session committed to ai-log/, and merge commits only (no squash).
   asked for a check against one concrete event.
 - Re-ran exact-duplicate and account-6 weekly queries myself in pgAdmin: matches 
   the profile.
+
+## 2026-11-08 — Approach addendum: agent tooling
+
+Agent tooling grows with the project. I don't set up subagents, skills or hooks
+upfront. When a step in the workflow repeats, or the agent makes the same kind of
+mistake twice, I turn it into a rule (CLAUDE.md), a command, a hook or a subagent.
+Each one should trace back to a concrete need in this project.
+
+First instance: CLAUDE.md, motivated by the timezone conversion mistake in session 01.
