@@ -30,3 +30,5 @@ session committed to ai-log/, and merge commits only (no squash).
 - Agent proposed `occurred_at AT TIME ZONE tz` on a naive UTC timestamp. That
   converts in the wrong direction. Corrected it to the double conversion and
   asked for a check against one concrete event.
+- Re-ran exact-duplicate and account-6 weekly queries myself in pgAdmin: matches 
+  the profile.
