@@ -41,3 +41,28 @@ mistake twice, I turn it into a rule (CLAUDE.md), a command, a hook or a subagen
 Each one should trace back to a concrete need in this project.
 
 First instance: CLAUDE.md, motivated by the timezone conversion mistake in session 01.
+
+## 2026-11-08 — Session 02 (planning)
+
+- I gave the agent my decisions upfront and asked it to challenge them, plus give options
+  only for what was still open (baseline window, verdict rule, metrics, minimum history,
+  AI feature shape).
+- Accepted: baseline must use only weeks *before* the selected week. Otherwise the
+  week selector leaks future data into older weeks. A good catch I had missed.
+- Accepted: rank locations by a standardized score, not raw difference, so small
+  locations aren't buried and a 2-event wobble doesn't top the list.
+- Rejected: the agent proposed Alembic create only the view and load schema.sql
+  directly via docker-compose. That breaks the brief (real schema + migrations) and
+  the starter README (put the schema in your own migrations). Migration 1 now creates
+  the tables.
+- Deferred instead of building: account-wide banner, chart-axis handling, second
+  verdict tier. The plan was getting too detailed. Parameter values and UI states
+  belong in the per-ticket plans.
+- Added: statistical parameters as typed config (pydantic-settings, env overrides).
+  Tuning the statistics isn't the focus of this exercise, but changing them later
+  should be trivial.
+- Reviewing the draft, I found two gaps: no ticket owned the scaffold / `make check`
+  gate, and no ticket covered README + clean-clone verification. Added both (T1 scope,
+  new T6). T6 is prioritized over the AI ticket.
+- The agent flagged it hadn't read seed.sql. I confirmed it has only INSERTs (no DDL),
+  so there's no conflict with migration 1.
