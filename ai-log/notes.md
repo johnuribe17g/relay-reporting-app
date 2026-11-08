@@ -66,3 +66,24 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   new T6). T6 is prioritized over the AI ticket.
 - The agent flagged it hadn't read seed.sql. I confirmed it has only INSERTs (no DDL),
   so there's no conflict with migration 1.
+
+## 2026-11-08 — Before T1: run path and planned agent tooling
+
+- Decided: the whole app runs via docker-compose from T1, not just the DB. `make up`
+  (db + api, migrations on startup), `make seed` (idempotent), `make check` (lint,
+  typecheck, tests inside the api container). A reviewer only needs Docker and make.
+  Reason: the brief's "~15 min local run" gets exercised on every ticket instead of
+  being discovered broken in T6.
+- Planned agent tooling, each tied to a trigger (per the tooling principle above).
+  I'll mark each one when it's actually built and what triggered it:
+
+  | Tool | Trigger | Status |
+  |---|---|---|
+  | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval | T1 plan approved (it becomes the template); first use in T2 | planned |
+  | PreToolUse hook blocking writes to `data/` | T1 touches seed and migrations, so the CLAUDE.md rule becomes a guarantee now | planned, in T1 plan |
+  | Hook protecting already-applied migrations | First migration merged to main | later |
+  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself | later |
+  | `/close-ticket` command: export reminder, notes.md line, PR description | Only if T2's closing repeats T1's steps | conditional |
+
+- Not building tooling upfront on purpose: a command derived from a plan that already
+  worked is better than one designed in the abstract.

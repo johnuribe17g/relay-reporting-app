@@ -13,7 +13,7 @@
 ## Sessions
 - [01-data-profiling.md](01-data-profiling.md) — profiling the seed data; corrected 
   the agent's timezone conversion (single AT TIME ZONE on a naive UTC timestamp) and asked for a concrete-event check.
-- [02-agent-tooling.md](02-planning.md) — drafting PLAN.md with the agent; accepted 
+- [02-planning.md](02-planning.md) — drafting PLAN.md with the agent; accepted 
   its future-data-leak catch, rejected loading the schema outside Alembic, trimmed detail down to ticket plans.
 
 ## Reflection
