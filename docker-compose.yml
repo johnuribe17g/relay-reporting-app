@@ -16,6 +16,15 @@ x-api: &api
     # Demo account used when X-Account-Id is missing: pass-through with NO default, so the default (15)
     # lives only in Settings.demo_account_id.
     DEMO_ACCOUNT_ID:
+    # AI summary (plans/T5-ai-summary.md): pass-through with NO default, so the defaults (off, mock)
+    # live only in SummarySettings.
+    LLM_SUMMARY_ENABLED:
+    SUMMARY_PROVIDER:
+    ANTHROPIC_API_KEY:
+    SUMMARY_MODEL:
+    SUMMARY_MOCK_MODE:
+    SUMMARY_TIMEOUT_SECONDS:
+    SUMMARY_MAX_TOKENS:
   volumes:
     - ./backend:/app
     - ./data:/data:ro

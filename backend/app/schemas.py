@@ -95,3 +95,25 @@ class History(BaseModel):
     baseline: BaselineOut | None
     weeks: list[WeekPoint]
     data_quality: DataQuality
+
+
+SummaryReason = Literal[
+    "disabled", "nothing_to_summarize", "provider_error", "timeout", "validation_failed"
+]
+
+
+class SummaryRequest(BaseModel):
+    # A string like `/api/report`'s `week`: `resolve_week` raises `invalid_week` (plans/T5 §1a).
+    week: str | None = None
+
+
+class SummaryOut(BaseModel):
+    """`text` is the server-rendered fact lines; `headline` is set only when `source` is `ai`."""
+
+    week: date | None
+    headline: str | None
+    text: str
+    source: Literal["ai", "template"]
+    reason: SummaryReason | None
+    provider: Literal["mock", "anthropic"]
+    prompt_version: str

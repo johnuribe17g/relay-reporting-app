@@ -8,6 +8,7 @@ import {
   getHistory,
   getReport,
   getWeeks,
+  postSummary,
 } from "./client";
 
 const fetchMock = vi.fn();
@@ -140,5 +141,31 @@ describe("client (plan §2d)", () => {
     const err = await pending;
     expect(err).toBe(reason);
     expect(err).not.toBeInstanceOf(ApiError);
+  });
+});
+
+describe("postSummary (plans/T5-ai-summary.md §2e)", () => {
+  test("K11 POSTs {week} as JSON with the account header", async () => {
+    await postSummary("15", "2026-07-20");
+    await postSummary("20", null);
+    const calls = fetchMock.mock.calls as [string, RequestInit][];
+    for (const [url, init] of calls) {
+      expect(url).toBe("/api/summary");
+      expect(init.method).toBe("POST");
+      expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    }
+    expect((calls[0]?.[1].headers as Record<string, string>)["X-Account-Id"]).toBe("15");
+    expect(calls[0]?.[1].body).toBe('{"week":"2026-07-20"}');
+    expect((calls[1]?.[1].headers as Record<string, string>)["X-Account-Id"]).toBe("20");
+    expect(calls[1]?.[1].body).toBe('{"week":null}');
+  });
+
+  test("K12 a 422 invalid_week body becomes an ApiError with that code", async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(reply(errInvalidWeek, 422)));
+    await expect(postSummary("15", "2026-01-05")).rejects.toMatchObject({
+      status: 422,
+      code: errInvalidWeek.error.code,
+      message: errInvalidWeek.error.message,
+    });
   });
 });

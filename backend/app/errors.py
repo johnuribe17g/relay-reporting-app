@@ -1,8 +1,8 @@
 """One error body for every non-2xx the API produces (plans/T3-backend-api.md §1d).
 
-`{"error": {"code": str, "message": str}}`. `RequestValidationError` can only come from the
-`X-Account-Id` header (`week` is parsed in `report.resolve_week`), so it always maps to
-`invalid_request`.
+`{"error": {"code": str, "message": str}}`. `RequestValidationError` comes from the
+`X-Account-Id` header or the JSON body of `POST /api/summary`. The week itself is parsed in
+`report.resolve_week`. All of them map to `invalid_request`.
 """
 
 from fastapi import FastAPI, Request

@@ -12,7 +12,8 @@ from app.db import get_engine
 from app.domain.models import JudgeParams
 from app.errors import ApiError
 from app.series import fetch_bounds
-from app.settings import report_settings, settings
+from app.settings import SummarySettings, report_settings, settings, summary_settings
+from app.summary.providers import Provider, select_provider
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,17 @@ def get_conn(engine: Annotated[Engine, Depends(get_engine)]) -> Iterator[Connect
 
 def get_judge_params() -> JudgeParams:
     return report_settings.judge_params()
+
+
+def get_summary_settings() -> SummarySettings:
+    return summary_settings
+
+
+def get_summary_provider(
+    config: Annotated[SummarySettings, Depends(get_summary_settings)],
+) -> Provider:
+    """The effective provider: the mock unless a real adapter is configured and keyed."""
+    return select_provider(config)
 
 
 def get_bounds(conn: Annotated[Connection, Depends(get_conn)]) -> Bounds:

@@ -7,6 +7,7 @@ import { ErrorBox } from "./components/ErrorBox";
 import { Glossary } from "./components/Glossary";
 import { LocationDetail } from "./components/LocationDetail";
 import { AccountSummary } from "./components/AccountSummary";
+import { SummaryCard } from "./components/SummaryCard";
 import { LocationTable } from "./components/LocationTable";
 import { Notice } from "./components/Notice";
 import { WeekSelector } from "./components/WeekSelector";
@@ -163,18 +164,22 @@ function ReportView({
   if (report.week === null) {
     const verdict = report.account_summary.verdict;
     return (
-      <p>
-        {verdict === "no_activity"
-          ? "This account has no activity yet."
-          : verdict === "not_enough_history"
-            ? "Not enough history yet to judge any week."
-            : "There is no week to show."}
-      </p>
+      <>
+        <p>
+          {verdict === "no_activity"
+            ? "This account has no activity yet."
+            : verdict === "not_enough_history"
+              ? "Not enough history yet to judge any week."
+              : "There is no week to show."}
+        </p>
+        <SummaryCard account={String(report.account.id)} week={null} />
+      </>
     );
   }
   return (
     <>
       <AccountSummary report={report} />
+      <SummaryCard account={String(report.account.id)} week={report.week} />
       <Glossary parameters={report.parameters} />
       <section>
         <h3>Locations</h3>

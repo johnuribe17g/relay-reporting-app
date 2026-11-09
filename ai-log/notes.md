@@ -337,10 +337,69 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 - /close-ticket ticked 9 of 10. It left my browser verification unticked because I hadn't reported it in that
   session, and it flagged that it could not confirm I made two of the commits (3991b1d, dc45091) because I didn't
   say so there. Both are mine.
-- Browser verification after `make reset && make up && make seed`: [(a)–(h): what I saw; note anything that
-  didn't match]. Before seeding: [what the page showed].
-- Numbers against curl (h): [which values I compared, e.g. account 15 Site C 12 / 5.5 / 0.8–10.2 / 2.77].
 - Decision log: added D-28 (presentation). No other entries: abort-by-signal and the effect dependencies are
   implementation fixes, recorded in the plan's deviations.
-- T4 numbers: [backend 274, frontend N] tests, mutations (a)–(y) all caught except my badly designed (t), which
-  the agent split.
+
+## 2026-11-09 — T5 pre-plan context
+
+- Order change: T5 before T6, against PLAN §8 ("6, then 5"). PLAN.md not edited; recorded as a
+  deviation in plans/T5-ai-summary.md with a time box and a cut rule (stop at the last green state).
+- Decided before the plan: a card under the account summary with a button (no chat); "AI summary"
+  vs "Template summary" label with the reason; POST /api/summary with the account from the header;
+  the model returns structured claims with no numbers and the server renders the figures; validator
+  plus deterministic fallback; mock provider only, real adapter if time remains; prompt as a
+  versioned file.
+- Flag off by default, but the card is always visible: with the flag off it returns the template
+  with reason "disabled" instead of PLAN §6's 404, so the demo works without configuration.
+- The label must say "mock provider" when the mock answers: presenting deterministic output as a
+  model's would be misleading. Framed as a preview, not production-ready (PLAN §11 lists what's missing).
+- Considered Spec Kit. For a 4–6 h slice I kept my own minimal flow (PLAN.md, a plan per ticket with
+  an approval gate, /plan-ticket and /close-ticket, the aggregation-reviewer, decisions.md), so every
+  artifact reflects a decision of mine, not a template.
+
+## 2026-11-09 — T5 plan review (rev. 1 → rev. 3) and S1
+
+- Rev. 1, Q1: with near-enum claims, a completeness rule and server-rendered text, a valid "AI
+  summary" was word-for-word the template; the model only ordered lines. My own decision 4 caused
+  it. Rejected the agent's recommendation to accept it (a gratuitous model call). Added a
+  model-written headline, validated on the server: ≤ 200 chars, no digits, locations only as
+  [L1]..[L5] tokens, a direction-word check against the verdicts. Fact lines unchanged.
+- Q8: location ids instead of names. Names are never sent to the model, so injection through
+  location names is removed rather than mitigated; the <data> escaping is now just hygiene.
+- The agent put the prompt in prompt.py, against my "versioned file" decision. Moved to
+  prompts/summary-v1.md, version taken from the file name.
+- Added reason nothing_to_summarize (week null): no provider call, no cost for an empty account.
+- Rev. 2 gap: the direction check skipped sentences without a token, so "The whole account is
+  lower" passed for a higher account. Added the account check (H13).
+- Time box extended by me, no pre-cuts; restored U7 (the card's only error-path UI test).
+- S1 review: the lexicon missed common verbs ("[L1] dropped" passed for a higher location).
+  Extended it and made the prompt use only "higher/lower than usual". The agent's time log called
+  `date` a lower bound; wrong, the file mtimes agree, caveat removed.
+- Considered LangChain (familiar ecosystem). Not used: one structured call with no tools, retrieval
+  or retries doesn't need it, and it would hide the validation inside the library, which is the
+  part under review. It would fit if the feature grew to multi-step or RAG (LangGraph, with
+  LangSmith for tracing and evals).
+- Used claude.ai chat to review each agent reply and the code against the repo before answering.
+
+## 2026-11-09 — T5 S2
+
+- S2 approved; the S11 deviation accepted (anthropic + key → mock until S6). In review: log truncation, a single SummaryReason type.
+- S3: PLAN §13 says all 15 of account 6’s locations flag on 2026-06-01; the seed says 12. Tests count from /api/report instead of hard-coding it; PLAN.md left as written, README will say 12.
+
+## 2026-11-09 — T5 S6: real provider, manual run
+
+- Config: SUMMARY_PROVIDER=anthropic, model claude-haiku-5-5, effort low, key in .env (not shown;
+  removed after the run). The claude-api skill corrected the plan's guesses: the anthropic-version
+  header, thinking counting toward max_tokens (300 → 1024), the answer read by block type.
+- Account 15, 2026-07-20: source ai, reason null, ~1.1 s. Headline: "Account activity is normal
+  overall, but Site C is higher than usual and is the place to look first." Fact lines identical
+  to the template.
+- Account 6, 2026-06-01 (spike): source ai, ~2.6 s. Headline: "Activity is higher than usual
+  across the whole account rather than in one place, so start with Site N, which shows the largest
+  gap." The model reordered the location lines (Site N first). 12 flagged + 3 not judged = 15,
+  confirming that PLAN §13's "all 15" is wrong.
+- Caught: "the largest gap" is a comparative the validator doesn't check, and the model only saw
+  5 of the 12 flagged locations. True among the listed ones, unverified beyond them. Added to D-29's
+  limits rather than adding a rule: numbers still come only from the server.
+- Before the run I asked for provider error messages in the log (type only would have made a 400
+  undebuggable). Not needed this time; no fallback occurred.

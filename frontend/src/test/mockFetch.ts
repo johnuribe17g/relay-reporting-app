@@ -12,10 +12,14 @@ import a6Report0601 from "./fixtures/a6-report-0601.json";
 import a6Report0720 from "./fixtures/a6-report-0720.json";
 import a6Weeks from "./fixtures/a6-weeks.json";
 import accounts from "./fixtures/accounts.json";
+import a15SummaryDisabled from "./fixtures/a15-summary-disabled.json";
 import errAccountNotFound from "./fixtures/err-account-not-found.json";
 
 export interface Call {
   path: string;
+  method: string;
+  /** The request body as sent, or null. */
+  body: string | null;
   /** The X-Account-Id header, or null when it was not sent. */
   account: string | null;
   signal: AbortSignal | undefined;
@@ -43,6 +47,8 @@ const fixtures: Record<string, unknown> = {
   "6|/api/report?week=2026-06-01": a6Report0601,
   "20|/api/report": a20Report,
   "15|/api/locations/Site%20C/history?week=2026-07-20": a15History,
+  // POST /api/summary, flag off (the default): the template with reason "disabled".
+  "15|/api/summary": a15SummaryDisabled,
 };
 
 function defaultHandler({ path, account }: Call): Response | undefined {
@@ -71,6 +77,8 @@ export function installFetch(extra: Handler[] = []): MockFetch {
       const headers = (init?.headers ?? {}) as Record<string, string>;
       const call: Call = {
         path,
+        method: init?.method ?? "GET",
+        body: typeof init?.body === "string" ? init.body : null,
         account: headers["X-Account-Id"] ?? null,
         signal: init?.signal ?? undefined,
       };
