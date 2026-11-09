@@ -327,6 +327,13 @@ def test_h8_week_is_checked_before_the_location(api: TestClient) -> None:
     assert response.json()["error"]["code"] == "invalid_week"
 
 
+def test_h8b_week_is_checked_first_even_when_the_location_is_also_absent(api: TestClient) -> None:
+    # Late starts 02-23, so it is absent at 02-09, and 02-09 is not selectable either: 422, not 404.
+    response = api.get("/api/locations/Late/history", params={"week": "2026-02-09"}, headers=hdr(1))
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_week"
+
+
 # ---- errors -------------------------------------------------------------------------------
 
 
