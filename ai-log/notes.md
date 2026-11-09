@@ -82,7 +82,7 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval   | T1 plan approved (it becomes the template); first use in T2                      | built at T1 close           |
   | PreToolUse hook blocking writes to `data/`                                                                            | T1 touches seed and migrations, so the CLAUDE.md rule becomes a guarantee now    | planned, in T1 plan         |
   | Hook protecting already-applied migrations                                                                            | First migration merged to main                                                   | replaced by deny rules (T1) |
-  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | later                       |
+  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | built at T2 close                       |
   | `/close-ticket` command: verifies, ticks the plan checklist, drafts the PR description, lists my steps                | Closing T1 by hand made the steps concrete; built then instead of waiting for T2 | built after T1              |
 
 - Not building tooling upfront on purpose: a command derived from a plan that already
@@ -139,4 +139,46 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   a missing ValueError for non-Monday weeks, and a false data claim (the "zero weeks inside the
   baseline" for 3 locations; only Site G's is). Lesson: a self-check bundled into the same
   generation step is weak. Run it as a separate step, or give it to the reviewer subagent.
-- Seeding the dev DB went beyond the command's allowed changes; I approved it explicitly.
+- Seeding the dev DB went beyond the command's allowed changes; I approved it 
+  explicitly.
+- Recomputed A1, A2, A4 in psql with percentile_cont (independent of the Python code): 
+  matches the tests
+- Pre-plan context: the agent challenged my decision 5 (complete week in account-local time vs
+  "no timezone logic in T2"). It was right that my wording was too broad, but its fix ("max
+  local_week minus one") dropped the injectable clock (D-03) and assumed the last week is always
+  partial. Rejected; went with a pure last_complete_week(as_of_utc, tz) using zoneinfo.
+- Also rejected its "gap" in the existence rule: listing a location with no events up to W as
+  unjudged would leak future data. Locations exist only through events.
+
+## 2026-11-08 — T2 implementation
+
+- Batch 1 (pure domain + settings): red runs were against NotImplementedError stubs, which only
+  prove the tests run. Asked for a mutation check: flipping >= / < in judge broke the boundary
+  rows (V1, V5, V7, V10) each time.
+- Caught a bug no test could see: the REPORT_* overrides documented in .env.example never reached
+  the app (compose didn't pass them; ReportSettings doesn't read .env). Tests passed because they
+  use monkeypatch in-process. Approved a deviation: pass-through in compose with no defaults,
+  verified end to end (no var → defaults, .env → override, shell var → override).
+- Batch 2 (series SQL): mutation check on the SQL. Removing the HAVING future-data guard broke
+  nothing: an empty generate_series range already excludes those locations. My expectation was
+  wrong; kept the HAVING as an explicit rule with a comment.
+- Committed after each checkpoint so later diffs on domain code would be meaningful (the agent
+  pointed out that git diff on untracked files proves nothing).
+
+## 2026-11-08 — T2 independent review
+
+- Built the aggregation-reviewer subagent (tooling table trigger: baseline SQL exists). No
+  expected values in its prompt; DB read-only via PGOPTIONS; I approved each query by hand. The
+  main agent's task to it was fixed to "Run your review as defined in your instructions" so it
+  couldn't leak numbers.
+- /list-agents showed nothing and I almost changed the frontmatter. It lists running subagents,
+  not defined ones; the agent was loaded all along.
+- Results: case A (account 6, 2026-06-01) matches the tests and my psql recompute exactly. Case B
+  (6 Site G) matched the plan's arithmetic but no test executed it. Case C (9 Site B, 05-04) is a
+  real-data boundary: z = -2.0 exactly. Added B and C as anchors A9/A10; the code agreed with every
+  value.
+- Its "deviations" were decisions already in the T2 plan (too_quiet, precedence, band, Sunday
+  23:59:59), which it can't read. One stands as a known limit: local-week logic exists twice
+  (the view's SQL and zoneinfo in weeks.py) and could diverge; they agree on the seed (A5).
+- Weak spot: its last-complete-week check isn't blind, because PLAN §2 states 2026-07-20 and it
+  didn't flag that.
