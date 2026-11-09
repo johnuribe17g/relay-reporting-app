@@ -5,7 +5,8 @@ import type { History, Report } from "./api/types";
 import { AccountSwitcher } from "./components/AccountSwitcher";
 import { ErrorBox } from "./components/ErrorBox";
 import { LocationDetail } from "./components/LocationDetail";
-import { LocationList } from "./components/LocationList";
+import { AccountSummary } from "./components/AccountSummary";
+import { LocationTable } from "./components/LocationTable";
 import { Notice } from "./components/Notice";
 import { WeekSelector } from "./components/WeekSelector";
 import { useAsync, type AsyncState } from "./hooks/useAsync";
@@ -172,10 +173,15 @@ function ReportView({
   }
   return (
     <>
+      <AccountSummary report={report} />
       <section>
-        <h2>Week of {report.week}</h2>
-        <p>Account verdict: {report.account_summary.verdict}</p>
-        <LocationList locations={report.locations} selected={selected} onSelect={onSelect} />
+        <h3>Locations</h3>
+        <LocationTable
+          locations={report.locations}
+          parameters={report.parameters}
+          selected={selected}
+          onSelect={onSelect}
+        />
       </section>
       <section>
         <LocationDetail location={selected} history={history} />

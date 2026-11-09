@@ -15,7 +15,8 @@ const A1_SEARCH = "?account=15&week=2026-07-20&location=Site+C";
 function open(search: string): void {
   window.history.pushState(null, "", `/${search}`);
 }
-const accountSelect = (): HTMLSelectElement => screen.getByLabelText(/^account/i);
+// The switcher's own label; /^account/i would also match the "Account summary" region.
+const accountSelect = (): HTMLSelectElement => screen.getByLabelText(/^account \(demo/i);
 const weekSelect = (): HTMLSelectElement => screen.getByLabelText(/^week$/i);
 const search = (): string => window.location.search;
 

@@ -6,7 +6,7 @@ Branch: `feat/T4-frontend` (created, checked out). No commits until asked.
 Pre-plan decisions (John): header-less bootstrap, unknown account = error state, global `fetch` stub, no ESLint, no auto-select of a location, CLAUDE.md edit limited to the Stack line and the Commands section, decision log limited to D-26 and D-27.
 
 **In:** the single screen (PLAN §5): account switcher (labeled as a demo stand-in for login), week selector, account summary, location table in API order with unjudged rows and their reason, location detail (about 12 weeks plus the selected week against one band), URL state, the states loading / error / `no_activity` / `not_enough_history` / data-quality warning; a `web` service in docker-compose; Vitest + React Testing Library + `tsc --noEmit` inside `make check`.
-**Out:** AI summary, per-type verdicts, styling work, ESLint, a production build or static serving, auth, **any change to `backend/`**, `data/`, `PLAN.md`. The only non-frontend files touched: `docker-compose.yml`, `Makefile`, `CLAUDE.md` (Stack line + Commands only), `docs/decisions.md` (D-26, D-27), this plan.
+**Out:** AI summary, per-type verdicts, styling beyond the minimal plain CSS of CP3c (no responsive design, dark mode, animations, icons or redesign), ESLint, a production build or static serving, auth, **any change to `backend/`**, `data/`, `PLAN.md`. The only non-frontend files touched: `docker-compose.yml`, `Makefile`, `CLAUDE.md` (Stack line + Commands only), `docs/decisions.md` (D-26, D-27), this plan.
 No backend change is needed: the Vite proxy removes CORS, and the demo account is learned from `/api/weeks` (D-22), so nothing new is exposed.
 
 ## 1. Design
@@ -27,6 +27,7 @@ frontend/
   src/reconcile.ts        pure: reconcileAccount, reconcileWeek, reconcileLocation
   src/format.ts           pure: fmtNum, fmtZ, fmtDiff, displayBand, fmtBand, fmtAsOf, copy helpers
   src/chart.ts            pure: chartGeometry            (CP3b, first to be cut)
+  src/styles.css          plain CSS, imported in main.tsx (CP3c, second to be cut)
   src/hooks/useAsync.ts   one small hook: key + abortable fetch -> {status, data, error}
   src/hooks/useUrlState.ts   URLSearchParams <-> history, popstate
   src/components/         AccountSwitcher, WeekSelector, AccountSummary, LocationTable, LocationDetail,
@@ -34,7 +35,7 @@ frontend/
   src/test/               setup.ts, mockFetch.ts, fixtures/*.json + README.md (§2, capture commands)
 ```
 
-No router, no state library, no data-fetching library, no CSS framework. Function over form: semantic HTML, a few inline layout rules.
+No router, no state library, no data-fetching library, no CSS framework. Function over form: semantic HTML and one plain `styles.css` (CP3c, scope change by John).
 
 ### 1a. Run path (D-26)
 
@@ -80,13 +81,14 @@ Flow (each step an effect keyed on its inputs, through `useAsync`): `/api/accoun
 - `displayBand(baseline)` clips `band_low` at 0 and is the one function used by both the text and the chart; the data is never changed. The chart's band is the selected week's band (D-17) drawn across all weeks, and is labeled so (baseline points outside it are not flags).
 - Copy comes from the API: "compared with the last N weeks" uses `baseline.weeks_used`; the `too_quiet` reason uses `baseline.median` and `parameters.min_baseline_median`; the `not_enough_history` reason uses `history_weeks` and `parameters.min_history_weeks`. Nothing hard-codes 12, 8 or 4. Wording is direction-neutral ("higher / lower than usual").
 - Dates stay strings (`new Date("2026-07-20")` is UTC and shifts a day in US zones): week shown as `Week of 2026-07-20`, `as_of` as `2026-07-27 22:20 UTC` via a regex. No `new Date`, no `Date.now` anywhere in `src` (checked in Done-when).
+- The location rows and the account summary carry `data-verdict="<verdict>"` (a styling hook for CP3c; the verdict text is always shown, color never replaces it).
 - Each of the six verdicts has text. Account level: `no_activity` (week `null`, 200) is its own empty state; `not_enough_history` with `week null` (events but no judgeable week; none in the seed) gets its own message, not the `no_activity` one.
 - `data_quality.unknown_events_in_window > 0` shows a warning at account level and in the detail, worded "in the baseline window plus this week", not "this week".
 - Errors: `ErrorBox` renders `{code, message}` from `ApiError`, for any of the four requests.
 
 ### 1e. Deliberately not done
 
-ESLint (Q3), a production build in `make check`, snapshot tests, per-type verdicts, styling, a location auto-select, re-ranking or grouping, caching of responses, rounding on the server, any backend change.
+ESLint (Q3), a production build in `make check`, snapshot tests, per-type verdicts, styling beyond CP3c's minimal CSS, a location auto-select, re-ranking or grouping, caching of responses, rounding on the server, any backend change.
 
 ## 2. Tests, written first
 
@@ -200,8 +202,8 @@ Expected displayed strings, redone by hand from T3 §2c.
 
 | # | Fixture | Arithmetic | Expected on screen |
 |---|---|---|---|
-| R1 | `a15-report-0720`, account summary | total 20; median 19; MAD 4; spread max(5.9304, 4.359, 1) = 5.9304; z = 1/5.9304 = 0.1686; h = max(11.8608, 3) → band 7.1392 … 30.8608 | `20`, normal `19`, range `7.1 to 30.9`, `0.17`, verdict normal |
-| R2 | `a15-report-0720`, locations | Site C: total 12, median 5.5, spread √5.5 = 2.3452 (> 1.4826·1), z = 6.5/2.3452 = 2.7716, diff 6.5, h = 4.6904 → 0.8096 … 10.1904 | first row is Site C with higher-than-usual, `12`, `5.5`, `0.8 to 10.2`, `2.77`, `+6.5` |
+| R1 | `a15-report-0720`, account summary (carries `data-verdict="normal"`) | total 20; median 19; MAD 4; spread max(5.9304, 4.359, 1) = 5.9304; z = 1/5.9304 = 0.1686; h = max(11.8608, 3) → band 7.1392 … 30.8608 | `20`, normal `19`, range `7.1 to 30.9`, `0.17`, verdict normal |
+| R2 | `a15-report-0720`, locations (the row carries `data-verdict="higher"`) | Site C: total 12, median 5.5, spread √5.5 = 2.3452 (> 1.4826·1), z = 6.5/2.3452 = 2.7716, diff 6.5, h = 4.6904 → 0.8096 … 10.1904 | first row is Site C with higher-than-usual, `12`, `5.5`, `0.8 to 10.2`, `2.77`, `+6.5` |
 | R3 | `a6-report-0601`, account summary | median 73.5, MAD 9, spread 13.3434, z = 806.5/13.3434 = 60.44; h = 26.6868 → 46.8132 … 100.1868 | `880`, `73.5`, `46.8 to 100.2`, `60.44`, higher |
 | R4 | **Order as given.** `a15-report-0720` with its locations reordered to `[Site B, an unjudged row, Site C, Site A]` | no sort by `|z|` (B before C), by name (B, U, C, A) or by unjudged-last yields it | DOM rows in exactly that order |
 | R5 | `a6-report-0720`, unjudged rows | Site M median 3.5 < 4 (`too_quiet`, T3 S11) | the row shows the reason with `3.5` and `4` (from `baseline.median` and `parameters.min_baseline_median`); `z` shows `—` |
@@ -242,9 +244,10 @@ One-time setup commands (recorded in the ai-log): the lockfile is generated in a
 - **CP1b: client, URL logic, shell.** `types.ts`, `client.ts`, `urlState.ts`, `reconcile.ts`, `useAsync`, `useUrlState`; App shell with the account switcher, week selector, loading, `ErrorBox`, the unknown-account error, the week notice, and the `no_activity` / `not_enough_history` empty states. A1 and A7 need the report and the history request, so CP1b also has a **minimal** location list (names as buttons) and a **minimal** `LocationDetail` (fetches the history, shows the heading and `ErrorBox`); CP2 and CP3a replace them. Tests: §2a, §2b, §2d, A1 to A10. `make check` green. D-26, D-27, the CLAUDE.md edit (Stack line and Commands section only). Review and commit.
 - **CP2: summary and location table.** `format.ts` (+ §2c F1 to F9), `AccountSummary`, `LocationTable` (API order, reasons), `DataQualityWarning`. Tests R1 to R9, R12.
 - **CP3a: location detail.** `LocationDetail`, `WeeksTable`, the band text with `displayBand`, the hint when nothing is selected. Tests R10, R11.
+- **CP3c: minimal CSS** (scope change by John, after CP3a and before CP3b). One `frontend/src/styles.css` imported in `main.tsx`. No dependency, no Tailwind, no CSS framework, no class-naming system. Scope: a system font stack; a max-width content column with margins and spacing; table borders and row striping; the header controls on one line; verdict badges colored through a `[data-verdict]` attribute selector (`higher`, `lower`, `too_quiet`, `not_enough_history`, `normal`) with 4 to 5 CSS variables. Color never replaces the verdict text; AA contrast. About 100 lines at most. No layout change that alters test queries (roles and text stay), so no test changes. The components already carry `data-verdict="<verdict>"` on each location row and on the account summary (added in CP2), so CP3c touches neither components nor tests.
 - **CP3b: SVG chart.** `chart.ts` (C1 to C6) and `WeekChart` over the same data, the weeks table stays beneath it. Test R13.
 
-**If time runs out, cut in this order:** (1) **CP3b**, the SVG chart: the detail already shows the weeks table and the band text (CP3a), which is the "weeks table against the band" fallback, so nothing is rewritten; (2) the **web healthcheck**: `make up --wait` treats a service without one as started. **Never cut:** `reconcile` and its tests (§2b, A1 to A9), the client header tests (§2d), the `make check` wiring, D-26 and D-27, the close verification. A third cut is not pre-agreed: if both are not enough, stop and ask.
+**If time runs out, cut in this order:** (1) **CP3b**, the SVG chart: the detail already shows the weeks table and the band text (CP3a), which is the "weeks table against the band" fallback, so nothing is rewritten; (2) **CP3c**, the CSS: the app is fully usable and tested without it (the healthcheck, formerly cut item 2, was already built in CP1a). Cut order: CP3b, then CP3c. **Never cut:** `reconcile` and its tests (§2b, A1 to A9), the client header tests (§2d), the `make check` wiring, D-26 and D-27, the close verification. A third cut is not pre-agreed: if both are not enough, stop and ask. Out of scope for CP3c: responsive design, dark mode, animations, icons, any redesign.
 
 ## 5. Decision-log entries (same change)
 
@@ -255,6 +258,7 @@ One-time setup commands (recorded in the ai-log): the lockfile is generated in a
 
 ## 6. Done when
 
+- [ ] **CP3c (if built):** `styles.css` is about 100 lines at most, imported in `main.tsx`, adds no dependency, `package.json` and the lockfile are unchanged by it, and the test suite is unchanged and green; verdict colors use `[data-verdict]` and the verdict text stays on screen; the text/background pairs meet AA (4.5:1, computed in the session).
 - [ ] **CP1a:** `make check` green with `tsc` and the smoke test; the empty-DB probe (status and body of `/api/accounts` and `/api/weeks`, no header) recorded in this plan; fixtures captured; the `up -V` / `pgdata` and `package.json`-change checks done.
 - [ ] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest, `tsc --noEmit`, vitest). Record the pass counts (backend and frontend).
 - [ ] The fixtures reproduce: after `make reset && make up && make seed`, the §2 commands run into a temporary directory and `diff -r` against `frontend/src/test/fixtures` is empty.
@@ -340,4 +344,22 @@ Result: neither is a 500. It matches the expectation of step 3 (200 `[]`; 404 `a
 **CP1b mutation checks (each applied alone, reverted, `cmp` against a backup).** Stop point 1: (a) `getWeeks` always sends the header: K2. (b) `reconcileAccount` with `Number()`: RA3 for `"015"`. (c) no notice for an out-of-range week: RW3 and both RW4 rows. (d) case-insensitive location match: RL3. (e) no `encodeURIComponent` on the location: K4 and K5. Review fix: `instanceof`-only abort check: K8 and K10. Stop point 2: (f) `/api/weeks` in parallel with `/api/accounts` when the URL has an account: both A3 rows. (g) `useAsync` without abort and without the superseded guard: both A9 rows. (h) the account switch uses `replaceState`: A7. (i) the week correction uses `pushState`: A2, the three A4 rows and A7. None survived.
 
 **CP1b test counts (`make check`, exit 0):** ruff clean, "41 files already formatted", mypy "no issues found in 38 source files", pytest 274 passed, `tsc --noEmit` clean, vitest 54 passed in 5 files (urlState 8, reconcile 19, client 10, App 16, smoke 1). Greps: no `new Date`, `Date.now` or `Intl.DateTimeFormat` and no `.sort(` in `frontend/src` outside `src/test` (the date grep was first run with an unquoted glob that errored under zsh, then re-run correctly; a control line confirms the pattern matches).
+
+## Deviations (scope change by John, before CP2)
+
+- **Minimal plain CSS added to T4** as a new checkpoint **CP3c**, after CP3a and before CP3b (see §4): one `frontend/src/styles.css`, no dependency, no framework, no class-naming system; system font stack, a max-width column, table borders and striping, the header controls on one line, verdict badges through `[data-verdict]` with 4 to 5 CSS variables, AA contrast, about 100 lines at most, no change to test queries.
+- **Why plain CSS and not Tailwind:** one screen. Tailwind would add a dependency, a config and a lockfile change for no second use (PLAN §10).
+- **Cut order becomes:** (1) CP3b, the SVG chart; (2) CP3c, the CSS. "Never cut" is unchanged. The web healthcheck (formerly cut item 2) was already built in CP1a.
+- **Out of scope stays:** responsive design, dark mode, animations, icons, any redesign.
+- **Consequence for CP2:** the location rows and the account summary get `data-verdict="<verdict>"` in CP2, so CP3c needs no component or test change.
+
+## Deviations (CP2)
+
+- **R9, location part moved to CP3a.** The plan's §1d puts the data-quality warning "at account level and in the detail"; the location detail is CP3a, so CP2 builds and tests `DataQualityWarning` at account level (`role="note"`, so it never collides with `alert` for errors or `status` for the week notice) and CP3a adds the location case.
+- **Selector tightened in `App.test.tsx` (approved test, one line).** `getByLabelText(/^account/i)` matched the new `Account summary` region as well as the switcher and broke A1, A2, A7 and A9. The query is now `/^account \(demo/i` (the switcher's own label). No assertion changed.
+- **`LocationList` removed**, replaced by `LocationTable`; the account summary is `AccountSummary` (a labelled `<dl>`: events this week, normal (median), normal range, score (z), difference, calls/leads/appointments), with the account time zone and `Data through <as_of>`. Both carry `data-verdict`. The normal range line says "(the edges count as unusual)" (Q6). The location button stays the only `button` per row, so A-tests' button queries are unchanged.
+- **Unjudged reasons** (`too_quiet`: "normal is 3.5 events a week, below 4"; `not_enough_history`: "5 of 8 weeks") come from `reasonText(summary, parameters)`, so no number is hard-coded.
+- **R8 is two tests** (location verdict labels; the two account empty states).
+
+**CP2 mutation checks (each applied alone, reverted, `cmp` against a backup).** (j) `LocationTable` sorts by |z|: R4. (k) `fmtZ` uses "-" instead of U+2212: F1. (l) the baseline sentence hard-codes 12: R6 and F8. (m) `displayBand` stops clipping at 0: F5. None survived.
 
