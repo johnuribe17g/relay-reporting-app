@@ -5,9 +5,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.api import router
 from app.db import get_engine
+from app.errors import register_handlers
 
 app = FastAPI(title="Relay reporting API")
+register_handlers(app)
+app.include_router(router)
 
 
 @app.get("/api/health")

@@ -53,6 +53,13 @@ _BOUNDS_SQL = text("SELECT min(occurred_at), max(occurred_at) FROM clean_events"
 
 
 @dataclass(frozen=True)
+class AccountRow:
+    id: int
+    name: str
+    timezone: str
+
+
+@dataclass(frozen=True)
 class AccountSeries:
     """An account's rollup series and its locations' series up to the selected week.
 
@@ -141,3 +148,29 @@ def history_and_x(series: Series) -> tuple[list[int], int]:
     """Split a series into the prior weekly totals (oldest first) and the selected week's total."""
     totals = [w.total for w in series.weeks]
     return totals[:-1], totals[-1]
+
+
+_ACCOUNT_START_SQL = text("SELECT min(local_week) FROM clean_events WHERE account_id = :account_id")
+
+
+def fetch_account_start(
+    conn: Connection, account_id: int, first_complete_week: date
+) -> date | None:
+    """First week of the account's series: its first event week, at least the first complete week.
+
+    None when the account has no clean events at all. Equals `Series.start_week` of the rollup
+    that `fetch_series` returns for any week on or after it.
+    """
+    _require_monday("first_complete_week", first_complete_week)
+    first_event_week: date | None = conn.execute(
+        _ACCOUNT_START_SQL, {"account_id": account_id}
+    ).scalar_one()
+    if first_event_week is None:
+        return None
+    return max(first_event_week, first_complete_week)
+
+
+def fetch_accounts(conn: Connection) -> list[AccountRow]:
+    """Every account ordered by id (the demo switcher's list)."""
+    rows = conn.execute(text("SELECT id, name, timezone FROM accounts ORDER BY id")).all()
+    return [AccountRow(id=r[0], name=r[1], timezone=r[2]) for r in rows]

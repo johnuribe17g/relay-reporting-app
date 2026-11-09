@@ -1,11 +1,12 @@
 # AI interaction log
 
 ## Tools & division of labor
-- **Claude (claude.ai chat):** orientation before and around the work: breaking the
-  take-home into phases, repo setup, and drafting the opening prompt for the first
-  Claude Code session. Not included because that conversation mixes in unrelated
-  personal topics. Product and implementation decisions are made and discussed in
-  the logged Claude Code sessions.
+- **Claude (claude.ai chat):** orientation before the work (phases, repo setup, the first
+  session's opening prompt). From T3 on, also a second reviewer on my side: I pasted the
+  agent's replies there and had it check them against the repo (read-only access to my local
+  clone) before I answered. Several T3 catches started there (the `no_activity` reuse, the
+  misdiagnosed reviewer fix, the quoted curl examples, the `fromisoformat` formats). It never
+  edited the repo. That conversation mixes in unrelated personal topics, so it isn't exported.
 - **Claude Code:** data profiling, planning with me, implementation, tests.
   Exported raw per session below.
 - **Me:** scope and design decisions, reviewing every diff, README and reflection.
@@ -34,6 +35,14 @@
   every query approved by hand). It matched A1 and found a real-data boundary case (z = −2.0
   exactly) that became anchor A10. Report and comparison in
   [T2-aggregation-review.md](T2-aggregation-review.md). Ends with /close-ticket.
+- [06-T3.md](06-T3.md) — T3 plan, implementation and close: report service behind thin
+  endpoints, per-account week range, error contract, backtest (4.93 % against an 8 % ceiling
+  fixed before the run, not tuned). Rejected reusing `no_activity` for an absent location (it
+  would leak future data) and a misdiagnosed reviewer fix. Mutation (d) survived and exposed an
+  H8 gap (H8b added). Caught: quoted curl examples that wouldn't match the permission prefix,
+  DEMO_ACCOUNT_ID never reaching the container (same bug as T2's REPORT_*).
+- [T3-aggregation-review.md](T3-aggregation-review.md) — reviewer derived the last complete
+  week blind; ~190 endpoint values matched its SQL; two cases became anchors S15/S16.
 
 ## Reflection
 (written at the end, based on notes.md)
