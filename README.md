@@ -1,1 +1,14 @@
 # Relay Analytics App — DASH-247
+
+## AI summary: status
+
+A short summary of the selected week, shown on a card under the account summary. Status: **optional, off by default, not production-ready.**
+
+- **Off by default.** `LLM_SUMMARY_ENABLED` is `false`. The card is always visible; nothing is requested until the user clicks **Generate summary**, and with the flag off the answer is a deterministic template built from the same report (`reason: "disabled"`). `POST /api/summary` takes `{"week": ...}` like `/api/report` and returns 200, not 404, when the flag is off.
+- **Enable it in one step:** copy `.env.example` to `.env`, set `LLM_SUMMARY_ENABLED=true`, run `make up`.
+- **Mock by default.** `SUMMARY_PROVIDER=mock` is the default and needs no key or network. Its output is labeled **"AI summary · preview (mock provider)"**, never presented as a model's. `SUMMARY_MOCK_MODE` forces each failure (`unknown_location`, `contradicting_verdict`, `malformed_json`, `exception`, `timeout`) so the fallback labels can be seen by hand. A real provider adapter (`SUMMARY_PROVIDER=anthropic`) is **not built**; that setting falls back to the mock with a logged warning, never an error.
+- **What the model may do.** The deterministic logic decides what is unusual. The model gets only ids and numbers for the current account (no location names, no account name) and returns a one or two sentence headline plus structured claims. The server validates both: claims are near-enums that must match the computed verdicts, and the headline has no digits, cites locations only as `[L1]`..`[L5]` tokens and must not contradict a verdict (a heuristic, see D-29). **Every number and name shown is rendered by the server**; the fact lines under the headline are the same with or without the model.
+- **Fallback.** Any failure returns the template with a `reason`: `disabled`, `nothing_to_summarize` (no week to summarize), `provider_error`, `timeout` or `validation_failed`. The UI label says which (`Template summary — <reason>`).
+- **Not production-ready.** What is missing before production is listed in [PLAN.md §11](PLAN.md#11-where-would-an-llm-fit), in the bullet "Before production" (evaluation set, logging and redaction policy, per-tenant rate limits and budget caps, a prompt-injection review, a review of what customer data may be sent to a provider, fallback-rate monitoring).
+- **Excluded by design:** a tool-calling chat, tools and MCP ([D-10](docs/decisions.md)). Also not built: caching, retries, streaming.
+- **Where it differs from PLAN.md:** the 200 template instead of a 404, the button click as the opt-in, and a model-written headline (PLAN §11 says no model-written text). Recorded in [D-29](docs/decisions.md); PLAN.md was not edited.
