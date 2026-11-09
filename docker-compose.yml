@@ -6,6 +6,13 @@ x-api: &api
     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-relay}:${POSTGRES_PASSWORD:-relay}@db:5432/${POSTGRES_DB:-relay}
     TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-relay}:${POSTGRES_PASSWORD:-relay}@db:5432/relay_test
     SEED_PATH: /data/seed.sql
+    # Report parameters: pass-through with NO default. Unset stays unset in the container, so the
+    # defaults live only in ReportSettings (an empty string would fail float parsing).
+    REPORT_BASELINE_WEEKS:
+    REPORT_MIN_HISTORY_WEEKS:
+    REPORT_Z_MIN:
+    REPORT_MIN_ABS:
+    REPORT_MIN_BASELINE_MEDIAN:
   volumes:
     - ./backend:/app
     - ./data:/data:ro
