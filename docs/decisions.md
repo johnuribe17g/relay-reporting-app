@@ -271,3 +271,33 @@ Details live in the linked PLAN.md / plans/ sections.
   out in the view (hides them from the data-quality test and from the warning).
 - **Consequences:** the seed has none (profile §5), so no number changes today. T3 decides how the warning is shown.
 - **Source:** [plans/T1-scaffold-db.md §9 (Q9)](../plans/T1-scaffold-db.md); [plans/T2-backend-core.md §1d](../plans/T2-backend-core.md).
+
+## D-17: `Baseline.band` is the verdict's no-flag region, defined in T2
+- **Context:** PLAN §6 has `baseline{median, band}` and does not define the band. The band must not contradict the
+  verdict.
+- **Decision:** `band = median ± max(z_min·spread, min_abs)`, the exact region where the verdict is not flagged. It is
+  computed in T2 next to `judge`; T3 only serializes it.
+- **Alternatives:** a band of `median ± z_min·spread` only, which would disagree with the verdict whenever `min_abs`
+  dominates; letting T3 define it.
+- **Consequences:** one definition shared by the verdict and the chart; T3 only serializes it.
+- **Source:** [plans/T2-backend-core.md §6 (Q7)](../plans/T2-backend-core.md).
+
+## D-18: `REPORT_` prefix and a separate settings class for the report parameters
+- **Context:** `Settings` is unprefixed (`DATABASE_URL`), and PLAN §10 names `LLM_SUMMARY_ENABLED` unprefixed.
+- **Decision:** the five report parameters (`baseline_weeks`, `min_history_weeks`, `z_min`, `min_abs`,
+  `min_baseline_median`) use a `REPORT_` prefix in their own `ReportSettings` class. They reach the container through
+  `docker-compose.yml` with no default there, so defaults live only in code. The AI flag keeps its PLAN name later.
+- **Alternatives:** a global prefix, which would rename `DATABASE_URL` in compose.
+- **Consequences:** two naming styles in the environment.
+- **Source:** [plans/T2-backend-core.md §6 (Q4)](../plans/T2-backend-core.md).
+
+## D-19: The aggregation-reviewer reads the database read-only through `PGOPTIONS`, with no DB role
+- **Context:** the reviewer subagent recomputes verdicts from `clean_events` and must not be able to change data.
+- **Decision:** read-only transactions via `PGOPTIONS='-c default_transaction_read_only=on'` on a fixed `psql` command
+  prefix, against the dev database. No dedicated role.
+- **Alternatives:** a dedicated Postgres role with `SELECT` only, rejected because it needs a DB change (a migration or
+  an init script) for a dev-only tool.
+- **Consequences:** `PGOPTIONS` is enough because the dev DB is re-seedable in seconds with `make seed` and every query
+  was approved by hand. It blocks writes at the session level but is not a privilege boundary. The reviewer's
+  instruction not to read `tests/` or §2 of the plan is also not technically enforced (the plan says so).
+- **Source:** `.claude/agents/aggregation-reviewer.md`; [plans/T2-backend-core.md §5](../plans/T2-backend-core.md).

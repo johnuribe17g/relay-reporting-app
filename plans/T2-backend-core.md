@@ -332,19 +332,36 @@ Implementation order (tests first, each red before green): `stats` → `verdict`
 
 ## 5. Done when
 
-- [ ] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest) — record the pass count.
-- [ ] `app/domain/` imports nothing from `sqlalchemy`, `app.settings` or the DB (checked with `grep`, no `percentile_cont` anywhere in `app/`).
-- [ ] Seed anchors A1–A8 pass against the seeded test DB.
-- [ ] **Independent check of the anchors by John:** recomputes A1, A2 and A4 in psql (queries in the Appendix) and compares with §2g.
+- [x] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest) — record the pass count.
+  - Evidence: `make check` green this session (ruff "All checks passed!", 30 files formatted, mypy "no issues found in 27 source files", pytest "154 passed"). Row → test, found by grepping test names and bodies:
+    - §2a (`tests/domain/test_stats.py`): S1 `test_s1_odd_length`; S2 `test_s2_even_length_averages_the_two_middle_values` (+ `test_s2_unsorted_input`); S3 `test_s3_single_value`; S4 `test_s4_empty_raises` (median, mad, spread); S5 `test_s5_sqrt_median_wins`; S6 `test_s6_floor_of_one_wins`; S7 `test_s7_scaled_mad_wins`; S8 `test_s8_floor_wins_over_both_terms_at_median_half`.
+    - §2b (`tests/domain/test_verdict.py`): V1 `test_v1_…` … V19 `test_v19_band_with_poisson_floor`, one `test_vN_` per row V1–V19 (V15 has two).
+    - §2c (`tests/domain/test_ranking.py`): R1–R6 `test_r1_…` … `test_r6_empty`.
+    - §2d (`tests/domain/test_weeks.py`): L1–L6 are the parametrized `test_last_complete_week` (ids L1–L6); L7 `test_l7_seed_as_of_gives_2026_07_20_in_every_zone`; L8 `test_l8_aware_datetime_is_rejected`; L9 `test_l9_unknown_timezone_raises`; F1 `test_f1_seed_data_start_gives_2026_02_02_in_every_zone`; F2 `test_f2_start_exactly_on_monday_midnight_keeps_that_week`; F3 `test_f3_one_second_after_monday_midnight_skips_to_next_week`.
+    - §2e (`tests/test_series.py`): SQ1–SQ15 incl. SQ3b, one `test_sqN_` per row (SQ14 `test_sq14_bounds`, SQ15 `test_sq15_non_monday_arguments_are_rejected`).
+    - §2f (`tests/test_settings.py`): defaults `test_defaults`; `REPORT_Z_MIN=2.5` `test_env_var_overrides_default`; `judge_params()` `test_judge_params_maps_every_field`; the 7 invalid cases (baseline 0, min history 0, min history 13, z_min 0, z_min −1, min_abs −1, min_baseline_median −1) in `test_invalid_values_are_rejected`; valid combination 6/4 `test_valid_smaller_window`.
+    - §2g (`tests/test_seed_anchors.py`): A1–A10 `test_a1_…` … `test_a10_…`.
+    - Missing rows: none.
+- [x] `app/domain/` imports nothing from `sqlalchemy`, `app.settings` or the DB (checked with `grep`, no `percentile_cont` anywhere in `app/`).
+  - Evidence: `grep -rnE "sqlalchemy|app\.settings|import psycopg|percentile_cont" backend/app/domain/` → no matches (exit 1); `grep -rn percentile_cont backend/app/` → no matches (exit 1).
+- [x] Seed anchors A1–A8 pass against the seeded test DB.
+  - Evidence: `backend/tests/test_seed_anchors.py` tests a1–a8 (plus a9, a10) are part of the 154 passed in `make check` this session.
+- [x] **Independent check of the anchors by John:** recomputes A1, A2 and A4 in psql (queries in the Appendix) and compares with §2g.
+  - Evidence: verified by John (stated in this session): he recomputed A1, A2 and A4 in psql with `percentile_cont`, independent of the Python code, and all matched the tests; recorded in `ai-log/notes.md`.
 - [ ] **Independent check by the `aggregation-reviewer` subagent** (`.claude/agents/aggregation-reviewer.md`, built at T2 close): clean context,
   read-only Bash (`psql`) plus Read/Grep, instructed (not technically enforced) not to read `tests/` or §2 of this plan. It gets PLAN §2 and the view definition, **no expected
   values**, and recomputes from `clean_events` on its own: account 6 at 2026-06-01, two (account, location, week) cases of its choice
   (one with a zero week in the baseline), and each account's last complete week. Its numbers are compared with the tests' by me afterwards, and
   it also reads `app/domain/` against PLAN §2 for deviations. Findings are pasted into the ai-log.
-- [ ] `ReportSettings` rejects every invalid case in §2f; defaults match §1e.
-- [ ] D-14, D-15, D-16 added to `docs/decisions.md`; D-06 and D-08 "T2 input" lines updated.
-- [ ] `git diff --exit-code main -- data/ PLAN.md backend/migrations/` is empty; no endpoint, no `get_current_account`, no response model added.
-- [ ] Nothing committed without your say-so.
+  - Not ticked yet: the paste into the ai-log. Done: the subagent ran in this session, and John compared its report (verified by John): case A matches A1 exactly; cases B and C were added as A9 and A10 and the code agreed with every value (in the 154 passing). Open: John exports this session's transcript, with the report, to `ai-log/05-T2-review-close.md`; `ai-log/04-T2-backend-core.md` does not contain it.
+- [x] `ReportSettings` rejects every invalid case in §2f; defaults match §1e.
+  - Evidence: `test_invalid_values_are_rejected` has 8 parametrized cases covering the 7 invalid cases listed in §2f (plus `baseline_weeks=6` with default min history 8); `test_defaults` and `test_valid_smaller_window` pass in the 154.
+- [x] D-14, D-15, D-16 added to `docs/decisions.md`; D-06 and D-08 "T2 input" lines updated.
+  - Evidence: `docs/decisions.md` headings D-14 (line 223), D-15 (244), D-16 (263); lines 104 and 141 (D-06 and D-08 consequences) say "see D-16" and no "T2 input" text remains.
+- [x] `git diff --exit-code main -- data/ PLAN.md backend/migrations/` is empty; no endpoint, no `get_current_account`, no response model added.
+  - Evidence: that command exited 0 this session. `grep -rnE "APIRouter|@app\.|get_current_account|response_model" backend/app` finds only `@app.get("/api/health")` in `backend/app/main.py`, a file not in `git diff main --name-only`.
+- [x] Nothing committed without your say-so.
+  - Evidence: verified by John (stated in this session): `4e03dc8` and `d503505` are his commits, made after reviewing each change. I made no commits this session (`git log main..HEAD` has 10 commits; the other 8 predate it and are not covered by that statement).
 
 ## 6. Open questions (decision needed)
 
