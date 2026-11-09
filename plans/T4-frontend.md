@@ -40,7 +40,7 @@ No router, no state library, no data-fetching library, no CSS framework. Functio
 
 `docker-compose.yml` gets a `web` service: `build: ./frontend`, env `API_URL: http://api:8000`, `ports: 127.0.0.1:5173:5173`, `volumes: ./frontend:/app` plus the anonymous `/app/node_modules`, `depends_on: api (service_healthy)`, and a healthcheck (`wget -qO- http://127.0.0.1:5173/ >/dev/null`; **cut item 2**). `make up` becomes `docker compose up -d --build --wait -V`.
 
-The node_modules trap and its handling: `npm ci` runs in the image, the bind mount would hide `/app/node_modules`, so an anonymous volume keeps the image's copy. Compose reuses anonymous volumes across recreates, so after a `package.json` change the old modules would shadow the new image; `-V` (`--renew-anon-volumes`) discards them on every `make up`. `-V` touches no named volume (`pgdata` stays); verified in Done-when. Host `node_modules` is never created (the lockfile is generated with `--package-lock-only`).
+The node_modules trap and its handling: `npm ci` runs in the image, the bind mount would hide `/app/node_modules`, so an anonymous volume keeps the image's copy. Compose reuses anonymous volumes across recreates, so after a `package.json` change the old modules would shadow the new image; `-V` (`--renew-anon-volumes`) discards them on every `make up`. `-V` touches no named volume (`pgdata` stays); verified in Done-when. No packages are ever installed on the host. Docker does create an **empty** `frontend/node_modules` directory on the host as the mount point of the anonymous volume whenever `web` runs (git-ignored, and not removable while the container exists); it holds nothing. The lockfile is generated in a throwaway copy of `package.json` and `package-lock.json`, never on the bind mount (see CP1a evidence).
 The proxy forwards `X-Account-Id` unchanged. The browser sees one origin, so the backend gets no CORS middleware. The Vite dev server is a dev tool, not a production serving story (README, T6).
 
 ### 1b. Client (`api/client.ts`)
@@ -226,7 +226,7 @@ make check      lint typecheck test, stopping at the first failure   ← runs ru
 ```
 
 `make seed`, `down`, `reset`, `migrate`, `psql`, `logs` are unchanged (`make reset` is expected to drop the anonymous volumes of the removed containers as well; checked at CP1a). `help` lists the same targets. The web app is served at http://127.0.0.1:5173.
-One-time setup commands (recorded in the ai-log): the lockfile is generated with `docker run --rm -v "$PWD/frontend":/app -w /app node:22-alpine npm install --package-lock-only`; dependency versions are the latest stable at that time and are fixed by the lockfile.
+One-time setup commands (recorded in the ai-log): the lockfile is generated in a throwaway directory, never on the bind mount: copy `package.json` and `package-lock.json` to it, run `docker run --rm -v "$TMP":/app -w /app node:22-alpine npm install --package-lock-only [--save[-dev] <pkgs>]` there, copy the two files back; dependency versions are the latest stable at that time and are fixed by the lockfile.
 `CLAUDE.md`: the Stack line `Frontend (planned, T4)` becomes `Frontend: React + TypeScript (strict) + Vite, Vitest + React Testing Library`; the Commands section gains the web URL and says `make check` also runs the frontend typecheck and tests. Nothing else in CLAUDE.md changes.
 
 ## 4. Checkpoints (one review and one commit each; tests first inside each)
@@ -283,4 +283,44 @@ Decisions (review): Q1 to Q3 as recorded in the pre-plan. **Q4 to Q9: the recomm
 
 ## Deviations / CP1a evidence
 
-(To be filled in during CP1a: the empty-DB probe's real status lines and bodies for `GET /api/accounts` and `GET /api/weeks` with no header, any change to the steps above.)
+**Run path checks (CP1a step 2 review).** With the stack up: `curl -si http://127.0.0.1:5173/api/health` -> `HTTP/1.1 200 OK`, `server: uvicorn`, body `{"status":"ok","db":"ok"}`; `curl -si -H 'X-Account-Id: 6' http://127.0.0.1:5173/api/weeks` -> `HTTP/1.1 200 OK`, body `account` = `{'id': 6, 'name': 'Metro Collision Centers', 'timezone': 'America/New_York'}` (the header passes through the proxy); `curl -si http://127.0.0.1:5173/` -> `200 OK`, `Content-Type: text/html`, Vite's HMR client injected, `<div id="root">` and `/src/main.tsx` present.
+
+**Deviation: host `frontend/node_modules`.** The first lockfile generation ran `npm install --package-lock-only` on the bind mount and left `frontend/node_modules/.package-lock.json` on the host (cause: npm writes its hidden lockfile there even with `--package-lock-only`). It was deleted. The directory itself came back: Docker creates an empty `frontend/node_modules` as the mount point of the anonymous volume each time `web` starts (confirmed: stopped `web`, `rmdir` worked, `docker compose start web` recreated it, 0 entries); while the container exists, `rm -rf` on it fails with "Permission denied". It is git-ignored and empty. The plan sentences (§1a, §3) were corrected, and the lockfile is now generated in a throwaway copy.
+
+**Deviation: `@types/node`.** It was first installed as `^26.6.6` (latest), newer than the `node:22` image; it is pinned to `^22` (lockfile: 22.20.5), regenerated in a container in a throwaway copy. Needed because `vite.config.ts` reads `process.env.API_URL` (TS2591 without it).
+
+**Known limit (not fixed):** `"node"` in `tsconfig` `types` applies to every file under `src`, so `process` and other Node globals also type-check in browser code. A reference to `process` in `src` would compile and then fail in the browser. Accepted for now; the alternative is a separate `tsconfig.node.json` for `vite.config.ts`.
+
+**CP1a step 3: empty-DB probe** (`make reset && make up`, no `make seed`; run 2026-11-09, no header on either call):
+
+```
+$ curl -si http://127.0.0.1:8000/api/accounts
+HTTP/1.1 200 OK
+server: uvicorn
+content-length: 2
+content-type: application/json
+
+[]
+
+$ curl -si http://127.0.0.1:8000/api/weeks
+HTTP/1.1 404 Not Found
+server: uvicorn
+content-length: 76
+content-type: application/json
+
+{"error":{"code":"account_not_found","message":"account 15 does not exist"}}
+```
+
+Result: neither is a 500. It matches the expectation of step 3 (200 `[]`; 404 `account_not_found`, the demo account 15 being absent), and it is the one error shape (D-20). Through the Vite proxy on :5173 both calls return the same status and body. So on an unseeded DB the page gets an empty account list and an `account_not_found` error; Done-when (g) means the UI must render that message.
+
+**CP1a steps 4 to 6 (run 2026-11-09).**
+
+- **Fixtures (step 4).** `make seed` -> `seed loaded: 20 accounts, 12626 events`; the 12 files were captured with the §2 commands into `frontend/src/test/fixtures/` (plus a `README.md` with the same commands). Sanity check, not a source of expected values: `a15-report-0720` first location `Site C`, verdict `higher`; `a15-history-siteC-0720` has 13 weeks (2026-04-27 … 2026-07-20), last role `selected` (matches R11's arithmetic); `a6-report-0601` account total 880, `higher`; `a20-report` verdict `no_activity`, `week` null; `a20-weeks` `[]` / `null`; `a6-history-siteG-0601` `band_low` -1.4303999999999997 (S16's −1.4304), `higher`; the two error fixtures carry the expected codes `account_not_found` and `invalid_week`. Regeneration into a temp dir and `diff -r` against the committed fixtures: empty.
+- **`up -V` and pgdata (step 5).** After `make seed`, `make up` twice: `select count(*) from activity_events` = 12626. `-V` replaced `web`'s `/app/node_modules` volume (a new volume name each time) and left `pgdata` alone.
+- **`package.json` change (step 5).** Throwaway: `ms` added in a throwaway copy of `package.json` and `package-lock.json`, copied back, `make up`: the node_modules volume was renewed and `require('ms')` worked in the container (`7200000` for `'2h'`). Reverted from a backup, `make up`: `ms` is gone. The SHA-256 of `package.json` (`a51c97ee…`) and `package-lock.json` (`18b06d66…`) are identical before and after, and `cmp` against the backup is clean. `git diff` is empty for both files only trivially, because `frontend/` is still untracked until the CP1a commit; the checksums are the proof.
+- **`make reset` (step 5).** It removed `web`'s anonymous volume (the volume name no longer exists, and the volume count went 13 -> 11, the other one being `relay_pgdata`).
+- **Finding, not fixed: `up -V` leaves the replaced volumes behind.** Each `make up` creates a new anonymous node_modules volume and the previous one is not removed; across two `make up` runs the volume count went 11 -> 13, and `docker volume ls -f dangling=true` listed 8 dangling anonymous volumes (some may belong to other projects). They stay until `make reset` (for the current one) or `docker volume prune`. `make check` does not leak volumes (13 before and after). Cost: disk, one node_modules copy per `make up`; no correctness effect.
+- **Web healthcheck (step 6).** `wget -qO /dev/null http://127.0.0.1:5173/`, interval 3s, timeout 3s, retries 15. `docker compose ps`: `relay-web-1 ... Up 3 seconds (healthy)`, api and db healthy too. This is cut item 2: removing the `healthcheck:` block from the `web` service undoes it.
+- **`make check` after step 6:** exit 0; ruff "All checks passed!", "41 files already formatted", mypy "no issues found in 38 source files", pytest "274 passed", `tsc --noEmit` clean, vitest "1 passed".
+- **Left for John:** the HMR check in the browser (instructions in the session).
+

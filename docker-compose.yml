@@ -67,5 +67,25 @@ services:
       timeout: 3s
       retries: 15
 
+  web:
+    build: ./frontend
+    environment:
+      # The Vite dev server proxies /api here, so the browser sees one origin and the API needs no CORS.
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Keeps the image's node_modules from being hidden by the bind mount; `make up` renews it (-V).
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
 volumes:
   pgdata:
