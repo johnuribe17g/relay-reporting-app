@@ -1,9 +1,9 @@
 """Typed settings: infrastructure (`Settings`) and the report parameters (`ReportSettings`)."""
 
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.domain.models import JudgeParams
@@ -48,3 +48,24 @@ class ReportSettings(BaseSettings):
 
 
 report_settings = ReportSettings()
+
+
+MockMode = Literal[
+    "ok", "unknown_location", "contradicting_verdict", "malformed_json", "exception", "timeout"
+]
+
+
+class SummarySettings(BaseSettings):
+    """The AI summary flag and provider (plans/T5-ai-summary.md §1d): off and mock by default."""
+
+    llm_summary_enabled: bool = False
+    summary_provider: Literal["mock", "anthropic"] = "mock"
+    anthropic_api_key: SecretStr | None = None
+    summary_model: str = "claude-haiku-5-5"
+    summary_timeout_seconds: float = Field(default=5.0, gt=0)
+    summary_max_tokens: int = Field(default=300, gt=0)
+    # Forces one failure in the mock, for tests and for seeing the fallback labels by hand.
+    summary_mock_mode: MockMode = "ok"
+
+
+summary_settings = SummarySettings()
