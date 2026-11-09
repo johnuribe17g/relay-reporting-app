@@ -301,3 +301,92 @@ Details live in the linked PLAN.md / plans/ sections.
   was approved by hand. It blocks writes at the session level but is not a privilege boundary. The reviewer's
   instruction not to read `tests/` or §2 of the plan is also not technically enforced (the plan says so).
 - **Source:** `.claude/agents/aggregation-reviewer.md`; [plans/T2-backend-core.md §5](../plans/T2-backend-core.md).
+
+## D-20: One report service behind thin endpoints; injectable inputs; one error shape
+- **Context:** the endpoints and the PLAN §9 backtest must exercise the same code, and PLAN §2 forbids `now()` and
+  future data. PLAN §6 leaves the JSON shapes and the error handling to the T3 plan.
+- **Decision:** `app/report.py` holds `build_weeks`, `build_report` and `build_history`, which map `fetch_series` →
+  `judge` → `rank` into the Pydantic models of `app/schemas.py`. `app/api.py` only parses and calls. The backtest calls
+  `build_report`, so it tests what the API serves. The as-of and data bounds (`get_bounds`), the verdict parameters
+  (`get_judge_params`) and the connection (`get_conn`) are dependencies that tests override; the defaults read
+  `fetch_bounds` over the view and `ReportSettings`, never `now()`. Every non-2xx has one body,
+  `{"error": {"code", "message"}}`: 404 `account_not_found`, 404 `location_not_found`, 422 `invalid_week`, 422
+  `invalid_request` (the `X-Account-Id` header, the only source of a validation error), 404 `not_found` and
+  `http_error` for other HTTP errors. `week` is taken as a string and parsed strictly (`YYYY-MM-DD`) in
+  `resolve_week`, so one place raises `invalid_week`. `no_activity` is a 200 empty state, never an error. Floats are
+  returned unrounded.
+- **Alternatives:** logic in the route functions; a backtest that calls the domain directly (it could pass while the
+  API maps something wrongly); FastAPI's default 422 body, or mapping `RequestValidationError` to different codes by
+  inspecting `loc`.
+- **Consequences:** the service module is the unit to test and to review. The frontend has one error shape to handle.
+  `GET /api/accounts` is the one endpoint that is not account-scoped (D-22).
+- **Source:** [plans/T3-backend-api.md §1a to §1d, §7](../plans/T3-backend-api.md).
+
+## D-21: Selectable weeks are per account and judgeable only; a location absent at W is a 404
+- **Context:** PLAN §6 says `/api/weeks` returns "the selectable complete weeks". Complete weeks start at 2026-02-02,
+  but a week with fewer than `min_history_weeks` prior weeks can only be `not_enough_history`. T2 left open what an
+  account that starts after W gets (T2 plan Q8), and `no_activity` already means "the account has no events at all"
+  (T2 precedence 1).
+- **Decision:** per account, in its own time zone, the selectable weeks run from the account's first week
+  (`max(first event week, first complete week)`) plus `min_history_weeks` weeks, through its last complete week. On the
+  seed that is 17 weeks per account, 2026-03-30 to 2026-07-20, default 2026-07-20. A week outside the list, a non-Monday
+  or a non-date is 422 `invalid_week`; no account-level verdict is `not_enough_history` inside the range. An account
+  with no events gets `weeks []`, `default_week null` and a 200 `no_activity` report. An account with events but no
+  judgeable week gets the same shape with `not_enough_history`. A location exists at W only through events up to W
+  (the T2 rule): history for a location that never had events, belongs to another account, or starts after W is 404
+  `location_not_found`, never a 200. The week is checked before the location.
+- **Alternatives:** all complete weeks, the early ones returning `not_enough_history`; a global range; a 200
+  `no_activity` for an absent location (it changes the verdict's meaning, and a 200 for a location that starts after
+  W leaks future data).
+- **Consequences:** the first 8 complete weeks are never selectable, so PLAN §9's "25 seed weeks" becomes 17 for
+  the backtest. Locations that start later than their account are judged `not_enough_history` inside the range; the
+  seed has none.
+- **Source:** [plans/T3-backend-api.md §1c, §7 (Q2, Q4)](../plans/T3-backend-api.md); [D-15](#d-15-statistics-in-python-sql-builds-the-zero-filled-series-location-existence-and-week-bounds).
+
+## D-22: Account from an `X-Account-Id` header with a demo default (account 15); `GET /api/accounts` is unscoped
+- **Context:** PLAN §1 wants a `get_current_account` dependency with a demo default or a header, and a UI account
+  switcher that stands in for login. PLAN §6 has no endpoint that lists accounts.
+- **Decision:** `get_current_account` reads `X-Account-Id`. A missing header uses `settings.demo_account_id`
+  (env `DEMO_ACCOUNT_ID`, default **15**); an unknown id is 404, a non-integer or an id below 1 is 422. The account
+  never comes from a path or query parameter, and every query takes its id. `GET /api/accounts` returns
+  `[{id, name, timezone}]` for the switcher. **Account 15 was picked only because it is the only account with a flagged
+  location at 2026-07-20** (Site C `higher`, z 2.7716, 12 events against a median of 5.5, in an otherwise normal
+  account), so the first screen answers "which location should I look at?". That is a demo choice and a setting, not a
+  property of the data. Account 6 (15 locations, the spike at `week=2026-06-01`) is one switcher click away.
+- **Alternatives:** the account in the path; no default (a request without the header fails); another default, such as
+  account 6, whose last complete week shows only a `too_quiet` location.
+- **Consequences:** `GET /api/accounts` lists every account name to any caller, acceptable for a demo stand-in for
+  login and replaced by auth later. A missing header silently selects the demo account, so a client that forgets the
+  header sees account 15's data, not an error.
+- **Source:** [plans/T3-backend-api.md §1a, §7 (Q1, Q3)](../plans/T3-backend-api.md).
+
+## D-23: Backtest assertions and result (not tuned)
+- **Context:** PLAN §9 asks for a sanity check, not a tuning exercise: the account 6 spike must flag and ordinary weeks
+  should rarely flag. D-14 gave an idealized flag rate of 3.4 % per location-week at median 7 and 5.1 % at median 4.5.
+- **Decision:** `tests/api/test_backtest.py` calls `build_report` for every account with events and every selectable week
+  (19 accounts × 17 weeks = 323 reports). Assertions fixed before the first run: B1 account 6 at 2026-06-01 is `higher`
+  at account level (total 880, z ≈ 60.44); B2 every judged location of account 6 at 2026-06-01 is `higher` (the
+  counts are recorded, not asserted to be 15 of 15); B3 the flag rate over judged location-weeks, excluding only account
+  6's 15 location-weeks of 2026-06-01, is at most **8.0 %**; B4 no account-level `not_enough_history` inside the
+  selectable range; B5 no exception and `history_weeks` never above `baseline_weeks`. Ran once, parameters used (the
+  defaults, no `REPORT_*` override): `baseline_weeks=12, min_history_weeks=8, z_min=2.0, min_abs=3.0,
+  min_baseline_median=4.0`. **Result: all five assertions passed. The parameters and the ceiling were not tuned.**
+  - 1,158 location-weeks outside the spike week: 1,115 judged, 55 flagged, **rate 4.93 %**; 42 `higher` and 13
+    `lower`; 43 unjudged, all `too_quiet`.
+  - Account level (same exclusion of the spike cell): 322 judged, 14 flagged, 4.35 %.
+  - Account 6 at 2026-06-01: 15 locations, 12 judged, 12 flagged `higher`, 3 unjudged (Sites C, H and O, all `too_quiet`).
+- **Alternatives:** a ceiling closer to D-14's idealized rate (it fails for the wrong reason on noisy weeks); no
+  ceiling (it proves nothing); tuning `z_min` or `min_abs` until the rate looks right.
+- **Consequences:** the actual rate (4.93 %) sits inside D-14's idealized 3.4 to 5.1 % band, and the 3.2 : 1 split
+  between `higher` and `lower` is consistent with the idealized 2.70 % against 0.73 %. A read-only breakdown after the
+  run (no code, no assertion) found no week with a cluster of flags: 1 to 6 location flags per week (at most 6 of 65
+  judged, spread over 6 different accounts), 4 flags at the first selectable week (2026-03-30) and 1 at the last
+  (2026-07-20), and none of the 14 account-level flags falls on either edge. Account 6's account-level `higher` at
+  2026-06-08 (z 2.136) was already anticipated by [data-profile §11](data-profile.md) ("the following week ... is also
+  slightly high, 102 vs. median 76"). 2026-03-08 is never a selected week; the weeks around it only enter the baselines
+  of the first selectable weeks, so the backtest says nothing about DST bucketing, which is covered by T1's view tests.
+  Account 12 has 10 of the 55 location flags, all `higher`, against about 10 % of the location-weeks; its account-level
+  weekly totals show no trend (32 to 68 events over the 25 complete weeks, no direction; one account-level flag,
+  2026-06-29 at 68), so the 10 location flags are not a trailing-baseline lag on a growing account; their cause at
+  location level was not investigated. If the ceiling ever fails, we discuss; we do not move a parameter.
+- **Source:** [plans/T3-backend-api.md §2d, §7 (Q8)](../plans/T3-backend-api.md); [D-14](#d-14-verdict-parameters-and-the-too_quiet-rule).
