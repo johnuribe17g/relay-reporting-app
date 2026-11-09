@@ -7,14 +7,18 @@ from app.settings import settings
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # No ORM models: migrations are hand-written, so there is nothing to autogenerate against.
 target_metadata = None
 
 
 def _url() -> str:
-    # Tests point a migration run at a throwaway database via -x url=...
+    # Tests point a run at a throwaway database through Config.attributes["url"];
+    # the CLI can do the same with `-x url=...`. Default: the app database.
+    attr = config.attributes.get("url")
+    if attr:
+        return str(attr)
     return context.get_x_argument(as_dictionary=True).get("url", settings.database_url)
 
 
