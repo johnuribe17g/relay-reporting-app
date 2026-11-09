@@ -1,0 +1,90 @@
+// Typed fetch client (plans/T4-frontend.md §1b). The account goes out only as the X-Account-Id header.
+
+import type { AccountOut, History, Report, WeeksOut } from "./types";
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function isErrorBody(body: unknown): body is { error: { code: string; message: string } } {
+  if (typeof body !== "object" || body === null || !("error" in body)) return false;
+  const error = (body as { error: unknown }).error;
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    typeof (error as { code?: unknown }).code === "string" &&
+    typeof (error as { message?: unknown }).message === "string"
+  );
+}
+
+function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function request<T>(path: string, account: string | null, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (account !== null) headers["X-Account-Id"] = account;
+
+  let response: Response;
+  try {
+    response = await fetch(path, { headers, signal });
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    throw new ApiError(0, "network_error", "Could not reach the API.");
+  }
+
+  if (!response.ok) {
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (isErrorBody(body)) {
+      throw new ApiError(response.status, body.error.code, body.error.message);
+    }
+    throw new ApiError(
+      response.status,
+      "unexpected_response",
+      `Unexpected response (HTTP ${response.status}).`,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+/** Never sends the account header: the one endpoint that is not account-scoped (D-22). */
+export function getAccounts(signal?: AbortSignal): Promise<AccountOut[]> {
+  return request<AccountOut[]>("/api/accounts", null, signal);
+}
+
+/** `account` null = header-less bootstrap (the server's demo account answers). */
+export function getWeeks(account: string | null, signal?: AbortSignal): Promise<WeeksOut> {
+  return request<WeeksOut>("/api/weeks", account, signal);
+}
+
+export function getReport(
+  account: string,
+  week: string | null,
+  signal?: AbortSignal,
+): Promise<Report> {
+  const query = week === null ? "" : `?week=${encodeURIComponent(week)}`;
+  return request<Report>(`/api/report${query}`, account, signal);
+}
+
+export function getHistory(
+  account: string,
+  location: string,
+  week: string,
+  signal?: AbortSignal,
+): Promise<History> {
+  const path = `/api/locations/${encodeURIComponent(location)}/history?week=${encodeURIComponent(week)}`;
+  return request<History>(path, account, signal);
+}
