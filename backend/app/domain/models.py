@@ -1,6 +1,7 @@
 """Domain value types. Frozen dataclasses; T3 maps them to API models."""
 
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 
 
@@ -40,3 +41,32 @@ class Judgement:
     baseline: Baseline | None
     z: float | None
     diff: float | None
+
+
+@dataclass(frozen=True)
+class WeekCounts:
+    """One zero-filled local week. `unknown` counts event types outside the three known ones."""
+
+    week: date
+    call_received: int
+    lead_created: int
+    appointment_set: int
+    unknown: int
+
+    @property
+    def total(self) -> int:
+        """The metric (D-08): the three known types only. Unknown types never count."""
+        return self.call_received + self.lead_created + self.appointment_set
+
+
+@dataclass(frozen=True)
+class Series:
+    """Contiguous weekly counts, oldest first; the last element is the selected week.
+
+    `key` is the location name, or None for the account rollup. `start_week` is when the
+    series' subject first exists (it can be earlier than `weeks[0]` when the lookback clips it).
+    """
+
+    key: str | None
+    start_week: date
+    weeks: tuple[WeekCounts, ...]
