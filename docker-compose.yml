@@ -13,6 +13,9 @@ x-api: &api
     REPORT_Z_MIN:
     REPORT_MIN_ABS:
     REPORT_MIN_BASELINE_MEDIAN:
+    # Demo account used when X-Account-Id is missing: pass-through with NO default, so the default (15)
+    # lives only in Settings.demo_account_id.
+    DEMO_ACCOUNT_ID:
   volumes:
     - ./backend:/app
     - ./data:/data:ro

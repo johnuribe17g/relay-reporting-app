@@ -330,3 +330,24 @@ LEFT JOIN clean_events e ON e.account_id = 15 AND e.location = 'Site C' AND e.lo
 -- weeks range (S2): first judgeable week = first complete week + 8 weeks
 SELECT date '2026-02-02' + 8 * 7;   -- 2026-03-30
 ```
+
+## Deviations
+
+- **S15, S16 added** from the aggregation-reviewer's independent cases (reviewer-sourced, like T2's A9 and A10): account 6 Site N at
+  2026-04-27 (zero week in the baseline, `|diff|` exactly `min_abs`, `normal`) and account 6 Site G at 2026-06-01 (`higher`, `band_low` −1.4304,
+  not clipped at 0). S14 stays dropped. The code agreed with every value.
+- **H8b added** after mutation (d) survived: H8 uses a location that exists at the week it asks for, so it cannot tell whether the week or the
+  location is checked first. H8b (`Late` at 2026-02-09: absent and not selectable, must be 422) fails under that mutation.
+- **`series.py` gets three additions**, not one: `fetch_account_start` (plan §1c), `fetch_accounts` and the `AccountRow` dataclass (review fix:
+  `api.py` stays parse and call only; `report.build_accounts` maps the rows). Nothing existing in `series.py` changed.
+- **Reviewer change (§6) as built:** the permission is `Bash(curl -s http://127.0.0.1:8000/api/:*)`, and the examples pass the week with
+  `-G -d week=...` and an unquoted URL so they match the prefix. This run **could not read `backend/app/series.py`** (it was not on the reviewer's
+  list); the zero-fill and location-start logic were checked through the API outputs only. `series.py` is now on its allowed reads.
+- **Backtest prints `PARAMS`** (the five values used), added before the one run, because `ReportSettings` reads `REPORT_*` from the
+  environment; the assertions did not change.
+- **`docker-compose.yml` (plan §3 said no compose change), fixed in T3 (compose pass-through, verified):** `DEMO_ACCOUNT_ID` was documented
+  in `.env.example` but never reached the api container, the same bug class as T2's `REPORT_*`. It is now a pass-through line in the `x-api`
+  environment with no default, so the default (15) lives only in `Settings.demo_account_id`. Verified end to end (api container recreated each time,
+  `GET /api/weeks` with no header): no variable → unset in the container, account 15; `DEMO_ACCOUNT_ID=6` in `.env` → account 6; `.env=6` plus a shell
+  `DEMO_ACCOUNT_ID=12` → account 12 (the shell wins); the shell variable alone → account 12; then `.env` removed (it did not exist before; it is
+  gitignored) and the api recreated with nothing set → account 15 again.
