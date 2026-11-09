@@ -67,7 +67,9 @@ def test_u5_resolve_week_rejects_weeks_outside_the_range(week: str) -> None:
     assert "2026-02-16 .. 2026-02-23" in excinfo.value.message
 
 
-@pytest.mark.parametrize("week", ["abc", "2026-13-01", ""])
+@pytest.mark.parametrize(
+    "week", ["abc", "2026-13-01", "", "20260216", "2026-W08-1", "2026-2-16", " 2026-02-16"]
+)
 def test_u5_resolve_week_rejects_a_non_date(week: str) -> None:
     with pytest.raises(ApiError) as excinfo:
         resolve_week(week, WEEKS)
