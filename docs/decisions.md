@@ -269,7 +269,7 @@ Details live in the linked PLAN.md / plans/ sections.
   total of 0.
 - **Alternatives:** counting unknown types in the total (the metric would silently change meaning); filtering them
   out in the view (hides them from the data-quality test and from the warning).
-- **Consequences:** the seed has none (profile §5), so no number changes today. T3 decides how the warning is shown.
+- **Consequences:** the seed has none (profile §5), so no number changes today. T3 decides how the warning is shown. T3 exposes it as `data_quality.unknown_events_in_window`, summed over the baseline weeks plus the selected week (a baseline undercount matters too); the name says it is not the selected week only.
 - **Source:** [plans/T1-scaffold-db.md §9 (Q9)](../plans/T1-scaffold-db.md); [plans/T2-backend-core.md §1d](../plans/T2-backend-core.md).
 
 ## D-17: `Baseline.band` is the verdict's no-flag region, defined in T2
@@ -390,3 +390,34 @@ Details live in the linked PLAN.md / plans/ sections.
   2026-06-29 at 68), so the 10 location flags are not a trailing-baseline lag on a growing account; their cause at
   location level was not investigated. If the ceiling ever fails, we discuss; we do not move a parameter.
 - **Source:** [plans/T3-backend-api.md §2d, §7 (Q8)](../plans/T3-backend-api.md); [D-14](#d-14-verdict-parameters-and-the-too_quiet-rule).
+
+## D-24: The aggregation-reviewer compares with the running API through a prefix-scoped `curl`
+- **Context:** the T2 reviewer recomputed verdicts from the database and read `app/domain/`. At T3 the code that serves the numbers is the API
+  mapping, and the domain can be right while the API maps it wrongly. Its last-complete-week check also was not blind, because PLAN §2 states
+  2026-07-20.
+- **Decision:** the reviewer derives each account's first and last complete week from the data and ignores any calendar date in PLAN. It may read the
+  API mapping and `series.py` (the latter added after the first run could not read it), and, only after its own recompute is written, it calls
+  `/api/weeks`, `/api/report` and `/api/locations/{location}/history` and compares totals, median, MAD, z, verdict, order and the weeks. Its tool is
+  `Bash(curl -s http://127.0.0.1:8000/api/:*)`; the examples pass the week with `-G -d` and an unquoted URL so they match the prefix. The prompt allows
+  only `-s`, `-G`, `-d` (the week) and `-H` (`X-Account-Id`), one URL per call.
+- **Alternatives:** no HTTP step (the domain could be right while the API maps it wrongly); a wrapper script with a fixed URL allow-list, which would
+  be enforced and not just instructed, rejected for the time budget, since the API is GET-only and the prefix plus the prompt are enough for a
+  dev-only tool.
+- **Consequences:** a prefix rule cannot forbid trailing flags such as `-o` or `--next`, so that part is instructed, not enforced, at the same level as
+  D-19's ban on reading `tests/`. The permission syntax was not tested before the first run, which completed without a permission stop. The first run
+  could not read `series.py`, so zero-fill and location start were checked through the API outputs only.
+- **Source:** [plans/T3-backend-api.md §6, §7 (Q9), Deviations](../plans/T3-backend-api.md); `.claude/agents/aggregation-reviewer.md`;
+  `ai-log/T3-aggregation-review.md`.
+
+## D-25: API tests: a module-scoped seeded connection and dependency overrides
+- **Context:** the seed tests load the seed inside a transaction that is rolled back, and its `TRUNCATE` holds `ACCESS EXCLUSIVE` locks until then,
+  so a test using `conn` cannot run in the same module. The contract tests need both tiny fixtures and the real seed.
+- **Decision:** the API tests live in `tests/api/` with their own `conftest.py`: a module-scoped `seeded_conn` (the pattern of
+  `test_seed_anchors.py`) and a `make_client` that overrides `get_conn` (and optionally the parameters and bounds) and clears every override on
+  teardown. The endpoints run on that one connection and never commit. Fixture tests use `conn`, seed tests and the backtest use `seeded_conn`, and no
+  module mixes the two.
+- **Alternatives:** seed once per session, which collides with the seed tests' `TRUNCATE` locks (found by reading `conftest.py` before planning); a
+  throwaway database per module, which works but adds a database create and drop to every run when the `test_seed_anchors.py` pattern already solves it.
+- **Consequences:** `TestClient` runs the sync endpoints in a worker thread, and the single connection is used by one request at a time, so this is
+  safe. A new test module must pick one of the two fixtures.
+- **Source:** [plans/T3-backend-api.md §2](../plans/T3-backend-api.md); `backend/tests/api/conftest.py`.

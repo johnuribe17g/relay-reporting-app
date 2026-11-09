@@ -272,17 +272,28 @@ Implementation order, each red before green: `test_report_unit` → `weeks_range
 
 ## 5. Done when
 
-- [ ] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest). Record the pass count.
-- [ ] Every endpoint's default week, explicit week, bad week, unknown account, unknown location, a location name with a space, and account 20 are covered (§2b, §2c).
-- [ ] Seed anchors through the API (S7 = A1, S8 = A2, S9 = A9; S5/S6 for the default account) match the T2 numbers.
-- [ ] Ranking order in `/api/report` matches `rank()` and the independent invariant (R2, R3, S6, S12).
-- [ ] Backtest B1–B5 pass; the actual flag rate, split and unjudged counts are in D-23. No parameter changed.
-- [ ] One error shape for every non-2xx (E7).
-- [ ] `git diff --exit-code main -- data/ PLAN.md backend/migrations/ backend/app/domain/` is empty; `git diff main -- backend/app/series.py` shows only the added function.
-- [ ] `grep -rnE "now\(\)|datetime\.now|utcnow" backend/app` finds nothing outside tests.
-- [ ] D-20 … D-23 in `docs/decisions.md`.
-- [ ] **aggregation-reviewer** (§6) run against the endpoint output and the new code; its report compared with the tests by John and pasted into the ai-log.
-- [ ] Nothing committed without your say-so.
+- [x] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest). Record the pass count.
+  - Evidence: `make check` this session: ruff "All checks passed!", "41 files already formatted", mypy "no issues found in 38 source files", pytest "274 passed". Rows → tests, found by listing the test names in `backend/tests/api/`: §2a U1–U5 (`test_report_unit.py`, U5 as 6 tests); §2b W1–W8, R1–R7, H1–H8, E1–E7 (`test_api_fixture.py`, one `test_<row>_` each, plus H8b added after mutation (d)); §2c S1–S13 (`test_api_seed.py`; S14 was dropped in the plan review) plus S15, S16 added from the reviewer; §2d B1–B5 (`test_backtest.py`). Missing rows: none.
+- [x] Every endpoint's default week, explicit week, bad week, unknown account, unknown location, a location name with a space, and account 20 are covered (§2b, §2c).
+  - Evidence: default week W1, R1, H1, S5; explicit week R3, H4, S7, S8; bad week E1–E4, H8, H8b; unknown account W6, E5 (header 999), E7; unknown location H4–H6; name with a space H1, H2, S8 (`Site%20A`); account 20 W3/S4 (weeks), R6/S10 (report; R6 uses the fixture's account 3, S10 the seed's account 20). Limits: the unknown-account case is exercised on `/api/weeks` and `/api/report` only, and the history endpoint has no account-20 case (H7 uses the fixture's account 3, which has no events); all three endpoints use the same `get_current_account` dependency.
+- [x] Seed anchors through the API (S7 = A1, S8 = A2, S9 = A9; S5/S6 for the default account) match the T2 numbers.
+  - Evidence: `test_s7_account_6_spike_week_is_higher`, `test_s8_ordinary_location_matches_anchor_a2`, `test_s9_zero_week_inside_the_baseline_is_an_explicit_row`, `test_s5_default_account_and_week`, `test_s6_default_account_locations_in_rank_order` are among the 274 passed; their expected numbers are T2 plan §2g's A1, A2, A9 (history, median, MAD, spread, z), and the aggregation-reviewer's independent recompute of A1 matched (`ai-log/T3-aggregation-review.md`, §4).
+- [x] Ranking order in `/api/report` matches `rank()` and the independent invariant (R2, R3, S6, S12).
+  - Evidence: `test_r2_…`, `test_r3_…`, `test_s6_…` and `test_s12_ranking_order` (3 cases, each checking the invariant and `rank()` over `judge()`) pass. Mutation check at checkpoint 3: reversing the rank order in `build_report` made R2, R3, S6, S11 (both cases) and S12 (all 3) fail (8 failed); reverted, `cmp` identical to the backup.
+- [x] Backtest B1–B5 pass; the actual flag rate, split and unjudged counts are in D-23. No parameter changed.
+  - Evidence: `pytest -s tests/api/test_backtest.py`, run once: "5 passed"; parameters printed `baseline_weeks=12, min_history_weeks=8, z_min=2.0, min_abs=3.0, min_baseline_median=4.0`; 1,115 judged, 55 flagged, 4.93 % (ceiling 8.0 %), 42 higher / 13 lower, 43 unjudged (all `too_quiet`); the same numbers are in D-23 (`docs/decisions.md:363`). `git diff main -- backend/app/settings.py` adds only the `demo_account_id` field and its comment; `backend/app/domain/` has no diff.
+- [x] One error shape for every non-2xx (E7).
+  - Evidence: `test_e7_every_error_has_the_one_shape` (8 parametrized cases: bad week, non-date week, bad header, unknown account on two endpoints, unknown location, week-before-location, unknown route) passes; E1–E6 check the codes.
+- [x] `git diff --exit-code main -- data/ PLAN.md backend/migrations/ backend/app/domain/` is empty; `git diff main -- backend/app/series.py` shows only the added function.
+  - Evidence: the command exited 0 this session (empty). `git diff main --numstat -- backend/app/series.py` → `33 0` (33 added lines, 0 deleted, so nothing existing changed). It is three additions, not one function: `fetch_account_start`, `fetch_accounts` and `AccountRow` (recorded under Deviations).
+- [x] `grep -rnE "now\(\)|datetime\.now|utcnow" backend/app` finds nothing outside tests.
+  - Evidence: the command finds exactly one line, `backend/app/deps.py:1`, a module docstring ("Tests override these, never `now()`"); no call to `now()`, `datetime.now` or `utcnow` anywhere in `backend/app`.
+- [x] D-20 … D-23 in `docs/decisions.md`.
+  - Evidence: headings at `docs/decisions.md` lines 305 (D-20), 325 (D-21), 346 (D-22), 363 (D-23).
+- [x] **aggregation-reviewer** (§6) run against the endpoint output and the new code; its report compared with the tests by John and pasted into the ai-log.
+  - Evidence: the reviewer ran this session (task "Run your review as defined in your instructions."); its report and the comparison with the tests are in `ai-log/T3-aggregation-review.md` (committed in `fb71b2d`). Compared by John: recomputed the reviewer's cases 2a (Site N, z −1.0117) and 2b (Site G, z 17.705) by hand, verified B2's three too_quiet locations in psql (medians 3.0/3.5/3.5), and checked its table against the tests (verified by John, stated in this session). S15 and S16 were added from its cases.
+- [x] Nothing committed without your say-so.
+  - Evidence: I ran no `git add`, `git commit`, `git checkout` or `git reset` in this session. `git log main..HEAD` shows 9 commits, all authored by `johnuribe17g`. John stated "committed" for checkpoints 1–4 and for the review fixes ("Fixes committed", "Checkpoint 3 approved, committed", "Backtest accepted, committed"); for the last three commits (`a7be57c` D-20…D-23, `fb71b2d`, `e48830d`) he said "I'll commit" in this session. (Note: the working tree still has an uncommitted `ai-log/notes.md`.)
 
 ## 6. Reviewer change (task in this ticket, not a silent edit)
 
