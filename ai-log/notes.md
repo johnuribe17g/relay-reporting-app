@@ -66,3 +66,66 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   new T6). T6 is prioritized over the AI ticket.
 - The agent flagged it hadn't read seed.sql. I confirmed it has only INSERTs (no DDL),
   so there's no conflict with migration 1.
+
+## 2026-11-08 — Before T1: run path and planned agent tooling
+
+- Decided: the whole app runs via docker-compose from T1, not just the DB. `make up`
+  (db + api, migrations on startup), `make seed` (idempotent), `make check` (lint,
+  typecheck, tests inside the api container). A reviewer only needs Docker and make.
+  Reason: the brief's "~15 min local run" gets exercised on every ticket instead of
+  being discovered broken in T6.
+- Planned agent tooling, each tied to a trigger (per the tooling principle above).
+  I'll mark each one when it's actually built and what triggered it:
+
+  | Tool                                                                                                                  | Trigger                                                                          | Status                      |
+  | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------- |
+  | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval   | T1 plan approved (it becomes the template); first use in T2                      | built at T1 close             |
+  | PreToolUse hook blocking writes to `data/`                                                                            | T1 touches seed and migrations, so the CLAUDE.md rule becomes a guarantee now    | planned, in T1 plan         |
+  | Hook protecting already-applied migrations                                                                            | First migration merged to main                                                   | replaced by deny rules (T1) |
+  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | later                       |
+  | `/close-ticket` command: verifies, ticks the plan checklist, drafts the PR description, lists my steps                | Closing T1 by hand made the steps concrete; built then instead of waiting for T2 | built after T1              |
+
+- Not building tooling upfront on purpose: a command derived from a plan that already
+  worked is better than one designed in the abstract.
+
+## 2026-11-08 — T1 skeleton review and deny-rule check
+
+- Ran `make reset && make up`, the health check and `make check` on my machine: all green.
+- Dropped the custom hook script the agent planned (Python script + ~12 unit tests) for
+  native `permissions.deny` rules: too much for the time budget, given the ro mount and
+  the `git diff` check already exist.
+- Tested the deny rules in a fresh session. First attempt: the agent refused on its own,
+  citing CLAUDE.md, so the permission layer was never exercised. Second attempt, with
+  an explicit override: the Edit tool returned "File is in a directory that is denied by
+  your permission settings". Reads still work. Two separate layers: the instruction the
+  agent chooses to follow, and the rule the harness enforces.
+- Asked the agent to lint migrations (it had excluded migrations/versions from ruff) and
+  to publish the api port on 127.0.0.1 only.
+- Verified the migrated table with \d in psql: matches schema.sql (no default on id, 
+  named constraints, composite index).
+- Migration 1 reviewed: tests written first (5 red → green). Agent caught SQLAlchemy's
+  implicit SERIAL on integer PKs (autoincrement=False) and fixed its own faithfulness
+  query instead of loosening the test. Verified the table with \d in psql.
+
+## 2026-11-08 — T1 close
+
+- Clean-clone check, run by me: dropped the shared DB volume first (compose project
+  name is fixed, so a second clone would reuse it), fresh clone into /tmp, no .env,
+  `make up && make seed && make check`: green in 2 seconds. Health returned 200.
+- Agent's closing checklist left one item open on purpose: CLAUDE.md still said
+  "Stack (planned)". It flagged it instead of ticking it or editing CLAUDE.md
+  unasked. Approved the one-line fix.
+- Accepted one gap: the week-changer test checks the clean view only, not raw rows.
+  The view is what the app reads.
+- The agent corrected its own earlier report (22 → 21 timezone cases) after my
+  independent recount.
+- Built /close-ticket now instead of waiting for T2 as the tooling table said: the
+  steps were already concrete from closing T1 by hand, and every remaining ticket
+  repeats them. The command verifies, ticks the plan checklist with evidence, drafts
+  the PR description, and lists what stays mine (export, notes, commit, PR, merge).
+  It never commits or pushes. First real use: T2.
+- Also built /plan-ticket now, from the approved T1 plan. It creates the ticket branch,
+  writes the plan in T1's structure, and self-checks for the two mistakes I caught in
+  T1's plan review (contradictions between sections, tests destroying shared state)
+  before stopping for approval. First use: T2, right after merging T1.
+

@@ -10,10 +10,11 @@ Never write application code without an approved plan: PLAN.md for the overall
 feature, and plans/<ticket>.md for each ticket. If the plan for the current work
 doesn't exist or I haven't approved it, stop and ask.
 
-## Stack (planned)
+## Stack
 - PostgreSQL 16 (docker-compose)
-- Backend: Python, FastAPI, SQLAlchemy 2.0 (sync), Alembic, Pydantic v2, pytest
-- Frontend: React + TypeScript + Vite
+- Backend: Python 3.12, FastAPI, SQLAlchemy 2.0 (sync), Alembic, Pydantic v2 + pydantic-settings,
+  psycopg 3, uv, pytest, ruff, mypy (strict)
+- Frontend (planned, T4): React + TypeScript + Vite
 - Keep it simple: no async SQLAlchemy, no task queues, no extra state libraries.
 
 ## Data rules
@@ -30,6 +31,14 @@ doesn't exist or I haven't approved it, stop and ask.
 - Tests first for aggregation logic, using small fixtures with hand-computed expected values.
 - Don't commit unless I ask. Conventional commit messages (feat:, fix:, test:, docs:, chore:).
 - If something in the data or the spec is ambiguous, ask instead of guessing.
+- When a ticket makes a design decision with real alternatives, add an entry to docs/decisions.md in the same change.
 
 ## Commands
-(to be added as the project is scaffolded)
+Only Docker and make are needed. Everything runs in containers.
+- `make up`: build and start db + api (a one-shot `migrate` service applies migrations first)
+- `make down`: stop (keeps the DB volume). `make reset`: stop and drop the DB volume
+- `make migrate`: apply migrations. `make seed`: truncate and reload `data/seed.sql` (destructive, idempotent)
+- `make psql`: psql on the dev database. `make logs`: follow api logs
+- `make check`: the quality gate: `make lint` (ruff check + format check), `make typecheck` (mypy),
+  `make test` (pytest). Tests use their own databases (`relay_test`, `relay_migrations_test`), never the dev one
+- API: http://127.0.0.1:8000, `GET /api/health`

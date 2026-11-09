@@ -1,0 +1,42 @@
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import create_engine, pool
+
+from app.settings import settings
+
+config = context.config
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
+
+# No ORM models: migrations are hand-written, so there is nothing to autogenerate against.
+target_metadata = None
+
+
+def _url() -> str:
+    # Tests point a run at a throwaway database through Config.attributes["url"];
+    # the CLI can do the same with `-x url=...`. Default: the app database.
+    attr = config.attributes.get("url")
+    if attr:
+        return str(attr)
+    return context.get_x_argument(as_dictionary=True).get("url", settings.database_url)
+
+
+def run_migrations_offline() -> None:
+    context.configure(url=_url(), target_metadata=target_metadata, literal_binds=True)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    engine = create_engine(_url(), poolclass=pool.NullPool)
+    with engine.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
