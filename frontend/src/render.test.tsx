@@ -3,13 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 
 import App from "./App";
-import type { LocationRow, Report, Verdict } from "./api/types";
+import type { History, LocationRow, Report, Verdict } from "./api/types";
 import { AccountSummary } from "./components/AccountSummary";
+import { LocationDetail } from "./components/LocationDetail";
 import { LocationTable } from "./components/LocationTable";
+import a15History from "./test/fixtures/a15-history-siteC-0720.json";
 import a15Report from "./test/fixtures/a15-report-0720.json";
 import a20Report from "./test/fixtures/a20-report.json";
+import a6HistorySiteG from "./test/fixtures/a6-history-siteG-0601.json";
 import a6Report0601 from "./test/fixtures/a6-report-0601.json";
 import a6Report0720 from "./test/fixtures/a6-report-0720.json";
+import errAccountNotFound from "./test/fixtures/err-account-not-found.json";
 import { installFetch, json } from "./test/mockFetch";
 
 // Fixtures are real API output; clones are mutated by one field inside the test, never stored.
@@ -212,5 +216,122 @@ describe("account summary and location table (plan §2f)", () => {
     );
     expect(window.history.length).toBe(before + 1);
     expect(screen.getByRole("button", { name: "Site A" })).toHaveAttribute("aria-current", "true");
+  });
+});
+
+const cloneHistory = (fixture: unknown): History => structuredClone(fixture) as History;
+
+function detail(history: History, historyWeeks = 12): HTMLElement {
+  render(
+    <LocationDetail
+      location={history.location}
+      historyWeeks={historyWeeks}
+      history={{ status: "ok", data: history }}
+    />,
+  );
+  return screen.getByRole("region", { name: "Location detail" });
+}
+
+describe("location detail (plan §2f, CP3a)", () => {
+  test("R9 at location level the data-quality warning shows only when unknown events exist", () => {
+    const history = cloneHistory(a15History);
+    const { unmount } = render(
+      <LocationDetail location="Site C" historyWeeks={12} history={{ status: "ok", data: history }} />,
+    );
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    unmount();
+
+    history.data_quality.unknown_events_in_window = 3;
+    render(
+      <LocationDetail location="Site C" historyWeeks={12} history={{ status: "ok", data: history }} />,
+    );
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent("3");
+    expect(note).toHaveTextContent("baseline window");
+  });
+
+  test("R10 a band whose low edge is negative is shown clipped at 0", () => {
+    // account 6 Site G at 2026-06-01: band_low is -1.4304 (T3 S16), shown as 0
+    const region = detail(cloneHistory(a6HistorySiteG));
+    expect(valueOf(region, "Normal range")).toMatch(/^0 to \d/);
+    expect(document.body.textContent).not.toContain("\u22121.4");
+    expect(document.body.textContent).not.toContain("-1.4");
+  });
+
+  test("R11 account 15 Site C at 2026-07-20: the weeks table and the selected row", () => {
+    // 2026-07-20 - 12 weeks = 84 days = 2026-04-27, on or after the first complete week 2026-02-02, so the
+    // window is full: 12 baseline weeks (04-27 .. 07-13) + the selected week = 13 rows. The totals are the
+    // hand-computed series of T3 S6: 5,4,4,6,4,5,10,4,6,6,7,6 and x = 12.
+    // Site C: median 5.5, z = 6.5/2.3452 = 2.7716, diff 6.5, band 0.8096 .. 10.1904.
+    const region = detail(cloneHistory(a15History));
+    expect(screen.getByRole("heading", { name: "Site C" })).toBeInTheDocument();
+    expect(region).toHaveAttribute("data-verdict", "higher");
+    expect(valueOf(region, "This week")).toBe("12");
+    expect(valueOf(region, "Normal (median)")).toBe("5.5");
+    expect(valueOf(region, "Normal range")).toContain("0.8 to 10.2");
+    expect(valueOf(region, "Score (z)")).toBe("2.77");
+    expect(valueOf(region, "Difference")).toBe("+6.5");
+
+    const body = within(within(region).getByRole("table", { name: "Weekly totals" }));
+    const data = body.getAllByRole("row").slice(1);
+    expect(data).toHaveLength(13);
+    expect(data.map((r) => cells(r)[0])).toEqual([
+      "2026-04-27", "2026-05-04", "2026-05-11", "2026-05-18", "2026-05-25", "2026-06-01", "2026-06-08",
+      "2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13", "2026-07-20",
+    ]);
+    expect(data.map((r) => cells(r)[1])).toEqual([
+      "5", "4", "4", "6", "4", "5", "10", "4", "6", "6", "7", "6", "12",
+    ]);
+    expect(data.slice(0, 12).every((r) => cells(r)[5] === "Baseline")).toBe(true);
+    const last = data[12] as HTMLElement;
+    expect(cells(last)[5]).toBe("Selected week");
+    expect(last).toHaveAttribute("data-role", "selected");
+    expect(region.textContent).toContain("the selected week's");
+  });
+
+  test("R17 the detail's not_enough_history reason uses the report row's history_weeks", () => {
+    // The history window here has 13 weeks (12 baseline + selected), so weeks.length - 1 would say 12:
+    // the number must come from the report row (history_weeks 5), not from the length of the window.
+    const history = cloneHistory(a15History);
+    history.verdict = "not_enough_history";
+    history.z = null;
+    history.diff = null;
+    history.baseline = null;
+    history.parameters.min_history_weeks = 8;
+    const region = detail(history, 5);
+    expect(region.textContent).toContain("5 of 8");
+    expect(region.textContent).not.toContain("12 of 8");
+  });
+
+  test("R17 end to end: the row's history_weeks reaches the detail through the report", async () => {
+    const report = clone(a15Report);
+    report.parameters.min_history_weeks = 8;
+    const row = report.locations.find((l) => l.location === "Site C") as LocationRow;
+    Object.assign(row, { verdict: "not_enough_history", history_weeks: 5, z: null, diff: null, baseline: null });
+    const history = cloneHistory(a15History);
+    history.verdict = "not_enough_history";
+    history.z = null;
+    history.diff = null;
+    history.baseline = null;
+    history.parameters.min_history_weeks = 8;
+    installFetch([
+      ({ path, account }) =>
+        account === "15" && path === "/api/report?week=2026-07-20" ? json(report) : undefined,
+      ({ path }) => (path.includes("/history") ? json(history) : undefined),
+    ]);
+    window.history.pushState(null, "", "/?account=15&week=2026-07-20&location=Site+C");
+    render(<App />);
+    const region = await screen.findByRole("region", { name: "Location detail" });
+    expect(region.textContent).toContain("5 of 8");
+  });
+
+  test("R11 a history error is shown with the API's code, not swallowed", async () => {
+    installFetch([
+      ({ path }) => (path.includes("/history") ? json(errAccountNotFound, 404) : undefined),
+    ]);
+    window.history.pushState(null, "", "/?account=15&week=2026-07-20&location=Site+C");
+    render(<App />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("account_not_found");
   });
 });

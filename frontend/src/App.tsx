@@ -183,9 +183,11 @@ function ReportView({
           onSelect={onSelect}
         />
       </section>
-      <section>
-        <LocationDetail location={selected} history={history} />
-      </section>
+      <LocationDetail
+        location={selected}
+        historyWeeks={report.locations.find((l) => l.location === selected)?.history_weeks ?? null}
+        history={history}
+      />
     </>
   );
 }

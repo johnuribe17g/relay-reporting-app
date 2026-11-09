@@ -25,13 +25,13 @@ frontend/
   src/api/client.ts       typed fetch client + ApiError
   src/urlState.ts         pure: parseUrl, buildUrl, next* transitions
   src/reconcile.ts        pure: reconcileAccount, reconcileWeek, reconcileLocation
-  src/format.ts           pure: fmtNum, fmtZ, fmtDiff, displayBand, fmtBand, fmtAsOf, copy helpers
-  src/chart.ts            pure: chartGeometry            (CP3b, first to be cut)
-  src/styles.css          plain CSS, imported in main.tsx (CP3c, second to be cut)
+  src/format.ts           pure: fmtNum, fmtZ, fmtDiff, displayBand, fmtBand, fmtAsOf, copy helpers, glossary(parameters) (CP3c)
+  src/chart.ts            pure: chartGeometry            (CP3b)
+  src/styles.css          plain CSS, imported in main.tsx (CP3c, last part of CP3c, first to be cut)
   src/hooks/useAsync.ts   one small hook: key + abortable fetch -> {status, data, error}
   src/hooks/useUrlState.ts   URLSearchParams <-> history, popstate
   src/components/         AccountSwitcher, WeekSelector, AccountSummary, LocationTable, LocationDetail,
-                          WeeksTable, WeekChart (CP3b), ErrorBox, Notice, DataQualityWarning
+                          WeeksTable, WeekChart (CP3b), Glossary (CP3c), ErrorBox, Notice, DataQualityWarning
   src/test/               setup.ts, mockFetch.ts, fixtures/*.json + README.md (§2, capture commands)
 ```
 
@@ -81,6 +81,7 @@ Flow (each step an effect keyed on its inputs, through `useAsync`): `/api/accoun
 - `displayBand(baseline)` clips `band_low` at 0 and is the one function used by both the text and the chart; the data is never changed. The chart's band is the selected week's band (D-17) drawn across all weeks, and is labeled so (baseline points outside it are not flags).
 - Copy comes from the API: "compared with the last N weeks" uses `baseline.weeks_used`; the `too_quiet` reason uses `baseline.median` and `parameters.min_baseline_median`; the `not_enough_history` reason uses `history_weeks` and `parameters.min_history_weeks`. Nothing hard-codes 12, 8 or 4. Wording is direction-neutral ("higher / lower than usual").
 - Dates stay strings (`new Date("2026-07-20")` is UTC and shifts a day in US zones): week shown as `Week of 2026-07-20`, `as_of` as `2026-07-27 22:20 UTC` via a regex. No `new Date`, no `Date.now` anywhere in `src` (checked in Done-when).
+- A glossary (CP3c, scope change by John): a `<details>` block under the location table, summary "What do these numbers mean?", one line each for Normal (median), Normal range, Score (z), Difference, Too quiet and Not enough history. The strings live in `format.ts` (`glossary(parameters)`), next to the other copy, and **every number in them comes from `report.parameters`** (`baseline_weeks`, `z_min`, `min_abs`, `min_baseline_median`, `min_history_weeks`), never a literal. The same one-line definitions are the `title` of the matching table headers.
 - The location rows and the account summary carry `data-verdict="<verdict>"` (a styling hook for CP3c; the verdict text is always shown, color never replaces it).
 - Each of the six verdicts has text. Account level: `no_activity` (week `null`, 200) is its own empty state; `not_enough_history` with `week null` (events but no judgeable week; none in the seed) gets its own message, not the `no_activity` one.
 - `data_quality.unknown_events_in_window > 0` shows a warning at account level and in the detail, worded "in the baseline window plus this week", not "this week".
@@ -214,6 +215,7 @@ Expected displayed strings, redone by hand from T3 §2c.
 | R10 | `a6-history-siteG-0601` | `band_low` is −1.4304 (T3 S16) | band text starts `0 to `; the text `−1.4` appears nowhere |
 | R11 | `a15-history-siteC-0720` | Expected count by calendar arithmetic, not from the fixture: the first complete week is 2026-02-02 (T2 F1); 2026-07-20 − 12 weeks = 84 days = **2026-04-27**, which is on or after 2026-02-02, so the window is full (Site C has 12 prior values, T3 S6): 12 baseline weeks (04-27 … 07-13) + the selected 07-20 = **13** rows; last role `selected` | a weeks table with that many rows, the last marked selected; the chart note says the band is the selected week's |
 | R12 | location row click | | `pushState` with `location=…`; row marked current |
+| R14 | (CP3c) glossary with `parameters` changed in a clone of `a15-report-0720`: `z_min 2.5`, `min_abs 4`, `baseline_weeks 9` (the fixture has 2, 3 and 12) | the copy is `… over up to the last {baseline_weeks} weeks …`, `… a week is flagged from ±{z_min}, and only if the difference is at least {min_abs} events.` Whole phrases, because `±2` alone is a substring of `±2.5` | the glossary text contains `from ±2.5,`, `at least 4 events` and `last 9 weeks`, and does **not** contain `from ±2,`, `at least 3 events` or `last 12 weeks`; the `title` of the `Score (z)` header contains `from ±2.5,` too; the summary text is `What do these numbers mean?` and the block is a `<details>` |
 | R13 | (CP3b) `a15-history-siteC-0720` | | an `<svg>` with one point per week and one band rect |
 
 ## 3. Make targets / commands
@@ -244,10 +246,19 @@ One-time setup commands (recorded in the ai-log): the lockfile is generated in a
 - **CP1b: client, URL logic, shell.** `types.ts`, `client.ts`, `urlState.ts`, `reconcile.ts`, `useAsync`, `useUrlState`; App shell with the account switcher, week selector, loading, `ErrorBox`, the unknown-account error, the week notice, and the `no_activity` / `not_enough_history` empty states. A1 and A7 need the report and the history request, so CP1b also has a **minimal** location list (names as buttons) and a **minimal** `LocationDetail` (fetches the history, shows the heading and `ErrorBox`); CP2 and CP3a replace them. Tests: §2a, §2b, §2d, A1 to A10. `make check` green. D-26, D-27, the CLAUDE.md edit (Stack line and Commands section only). Review and commit.
 - **CP2: summary and location table.** `format.ts` (+ §2c F1 to F9), `AccountSummary`, `LocationTable` (API order, reasons), `DataQualityWarning`. Tests R1 to R9, R12.
 - **CP3a: location detail.** `LocationDetail`, `WeeksTable`, the band text with `displayBand`, the hint when nothing is selected. Tests R10, R11.
-- **CP3c: minimal CSS** (scope change by John, after CP3a and before CP3b). One `frontend/src/styles.css` imported in `main.tsx`. No dependency, no Tailwind, no CSS framework, no class-naming system. Scope: a system font stack; a max-width content column with margins and spacing; table borders and row striping; the header controls on one line; verdict badges colored through a `[data-verdict]` attribute selector (`higher`, `lower`, `too_quiet`, `not_enough_history`, `normal`) with 4 to 5 CSS variables. Color never replaces the verdict text; AA contrast. About 100 lines at most. No layout change that alters test queries (roles and text stay), so no test changes. The components already carry `data-verdict="<verdict>"` on each location row and on the account summary (added in CP2), so CP3c touches neither components nor tests.
+- **CP3c: minimal CSS and a short glossary** (two scope changes by John; order: after CP3b, glossary first and CSS last, see Deviations).
+  *CSS:* one `frontend/src/styles.css` imported in `main.tsx`. No dependency, no Tailwind, no CSS framework, no class-naming system. Scope: a system font stack; a max-width content column with margins and spacing; table borders and row striping; the header controls on one line; verdict badges colored through a `[data-verdict]` attribute selector (`higher`, `lower`, `too_quiet`, `not_enough_history`, `normal`) with 4 to 5 CSS variables. Color never replaces the verdict text; AA contrast. About 100 lines at most. No layout change that alters test queries (roles and text stay). The components already carry `data-verdict="<verdict>"` on each location row and on the account summary (added in CP2), so the CSS part touches neither components nor tests.
+  *Glossary:* a `<details>` block below the location table, summary "What do these numbers mean?", with one line each (proposed copy, `{...}` from `report.parameters`):
+  - **Normal (median):** the middle value of the weekly totals over up to the last {baseline_weeks} weeks; half the weeks were above it, half below. ("up to": a newer location has fewer weeks; the account summary line shows the weeks actually used, `baseline.weeks_used`.)
+  - **Normal range:** totals inside it count as normal; a total at an edge or outside it is flagged. It comes from the median and how much the weeks usually vary.
+  - **Score (z):** how unusual this week is, in units of typical week-to-week variation. 0 is exactly normal; a week is flagged from ±{z_min}, and only if the difference is at least {min_abs} events.
+  - **Difference:** this week's total minus the median.
+  - **Too quiet:** the normal week has fewer than {min_baseline_median} events, too few to judge a quiet week.
+  - **Not enough history:** fewer than {min_history_weeks} weeks of data, too few to judge.
+  The same one-line definitions (first four) are the `title` attribute of the matching `<th>` in `LocationTable`. The strings live in `format.ts` as `glossary(parameters)`; a new `Glossary` component renders them; `ReportView` places it under the table. One new test, **R14** (§2f). Mutation check at CP3c: hard-code `z_min` 2 in the glossary copy -> R14 must fail. Because the glossary changes components and adds a test, CP3c is not purely stylistic; the existing tests stay as they are (the glossary's `<dt>` texts do not collide with the table or summary queries, which are scoped to their own region or table).
 - **CP3b: SVG chart.** `chart.ts` (C1 to C6) and `WeekChart` over the same data, the weeks table stays beneath it. Test R13.
 
-**If time runs out, cut in this order:** (1) **CP3b**, the SVG chart: the detail already shows the weeks table and the band text (CP3a), which is the "weeks table against the band" fallback, so nothing is rewritten; (2) **CP3c**, the CSS: the app is fully usable and tested without it (the healthcheck, formerly cut item 2, was already built in CP1a). Cut order: CP3b, then CP3c. **Never cut:** `reconcile` and its tests (§2b, A1 to A9), the client header tests (§2d), the `make check` wiring, D-26 and D-27, the close verification. A third cut is not pre-agreed: if both are not enough, stop and ask. Out of scope for CP3c: responsive design, dark mode, animations, icons, any redesign.
+**If time runs out, cut in this order (John's call, after CP3a):** (1) the **CSS** part of CP3c, (2) the **glossary** part of CP3c. The **SVG chart (CP3b) is not a cut item.** CP3c is built glossary first and CSS last, so a partial CP3c is still coherent. **Never cut:** `reconcile` and its tests (§2b, A1 to A9), the client header tests (§2d), the `make check` wiring, D-26 and D-27, the close verification. A further cut is not pre-agreed: if both are not enough, stop and ask. Out of scope for CP3c: responsive design, dark mode, animations, icons, any redesign. (The web healthcheck, formerly cut item 2, was already built in CP1a.)
 
 ## 5. Decision-log entries (same change)
 
@@ -258,7 +269,7 @@ One-time setup commands (recorded in the ai-log): the lockfile is generated in a
 
 ## 6. Done when
 
-- [ ] **CP3c (if built):** `styles.css` is about 100 lines at most, imported in `main.tsx`, adds no dependency, `package.json` and the lockfile are unchanged by it, and the test suite is unchanged and green; verdict colors use `[data-verdict]` and the verdict text stays on screen; the text/background pairs meet AA (4.5:1, computed in the session).
+- [ ] **CP3c (if built):** `styles.css` is about 100 lines at most, imported in `main.tsx`, adds no dependency, `package.json` and the lockfile are unchanged by it; verdict colors use `[data-verdict]` and the verdict text stays on screen; the text/background pairs meet AA (4.5:1, computed in the session). The glossary: `<details>` under the table with the six lines, every number from `report.parameters`, the same definitions as `title` on the four matching headers, R14 passes, the mutation that hard-codes `z_min` 2 fails R14, and every other test is unchanged and green.
 - [ ] **CP1a:** `make check` green with `tsc` and the smoke test; the empty-DB probe (status and body of `/api/accounts` and `/api/weeks`, no header) recorded in this plan; fixtures captured; the `up -V` / `pgdata` and `package.json`-change checks done.
 - [ ] Every row of §2 exists as a test and passes; `make check` is green (ruff, ruff format, mypy strict, pytest, `tsc --noEmit`, vitest). Record the pass counts (backend and frontend).
 - [ ] The fixtures reproduce: after `make reset && make up && make seed`, the §2 commands run into a temporary directory and `diff -r` against `frontend/src/test/fixtures` is empty.
@@ -283,6 +294,7 @@ Decisions (review): Q1 to Q3 as recorded in the pre-plan. **Q4 to Q9: the recomm
 | Q6 | **Band edges.** The band is an open interval (D-17: `band_low < x < band_high`), so a total exactly at an integer edge is flagged (median 9, h 6: band 3 to 15, total 15 is `higher`). A line "Normal range 3 to 15" next to that looks contradictory. | Label it "Normal range: 3 to 15 (the edges count as unusual)". | The copy states a rule that lives in the backend; if D-17 changes, the copy must change. |
 | Q7 | **Selected-week label.** The API gives only the Monday. | Show `Week of 2026-07-20` plus the account's `timezone`; no end date computed (no `Date` arithmetic). | No "Jul 20 – Jul 26" range, which would need date arithmetic or a library. |
 | Q8 | **Node image and package versions** are not chosen here (`node:22-alpine` is the proposal; Vite, React, Vitest are "latest stable" at install). | Pin the Node major in the Dockerfile and let the lockfile fix the rest; record the versions in the ai-log. | A later `npm install` can move minor versions; `npm ci` and the lockfile prevent it for reviewers. |
+| Q10 | **Glossary and the cut order.** CP3c holds both the CSS and the glossary. | **Decided by John (after CP3a):** order CP3b, then CP3c with the glossary first and the CSS last; cut order if ever needed: the CSS, then the glossary; the chart is not a cut item. | Cutting the CSS first keeps the explanation of the numbers; nothing is expected to be cut. |
 | Q9 | **A switcher entry for account 20** (no events) is listed like the others. | Yes: it is the empty-state demo (verification c). | None. |
 
 ## Deviations / CP1a evidence
@@ -362,4 +374,27 @@ Result: neither is a 500. It matches the expectation of step 3 (200 `[]`; 404 `a
 - **R8 is two tests** (location verdict labels; the two account empty states).
 
 **CP2 mutation checks (each applied alone, reverted, `cmp` against a backup).** (j) `LocationTable` sorts by |z|: R4. (k) `fmtZ` uses "-" instead of U+2212: F1. (l) the baseline sentence hard-codes 12: R6 and F8. (m) `displayBand` stops clipping at 0: F5. None survived.
+
+## Deviations (scope change by John, before CP3a)
+
+- **A short glossary added to CP3c**, besides the CSS (see §4 and §1d): a `<details>` block "What do these numbers mean?" below the location table with one line each for Normal (median), Normal range, Score (z), Difference, Too quiet and Not enough history. Every number in the copy comes from `report.parameters`; `{weeks}` is `parameters.baseline_weeks`, never a literal. The same definitions are the `title` of the matching table headers. The strings live in `format.ts` as `glossary(parameters)`. One new test, R14 (with `z_min 2.5`, `min_abs 4`, `baseline_weeks 9` in a clone, whole phrases), and one mutation (hard-code `z_min` 2 -> R14 fails).
+- **Wording changes to the proposed copy:** "over up to the last N weeks" (a newer location has fewer weeks, and the account summary shows the weeks actually used); the two "not judged" reasons are two lines and carry their parameters (`min_baseline_median`, `min_history_weeks`) instead of the shared line "too few events, or too few weeks".
+- **Correction to the CSS deviation above:** it said CP3c needs no component or test change. That held for the CSS alone. With the glossary, CP3c adds `Glossary` and `glossary()`, adds `title` attributes in `LocationTable` and places the block in `ReportView`, and adds R14. Existing tests are untouched.
+- **Cut order unchanged in the plan's text** (CP3b, then CP3c), but see Q10: CP3c now holds content as well as polish.
+
+## Deviations (CP3a)
+
+- **R9, location part, built here** (moved from CP2): the warning in the detail, `role="note"`, worded as the window.
+- **One extra test beyond the plan:** "a history error is shown with the API's code" (App-level, the history route answers 404): a regression guard for the error branch of `LocationDetail`. It passed against the minimal CP1b detail already, so it was not red first.
+- **R11 expected values are all from the plan's arithmetic**, not from the fixture: the 13 Mondays 2026-04-27 .. 2026-07-20 and the totals `5,4,4,6,4,5,10,4,6,6,7,6` + `12` (T3 S6), plus median 5.5, z 2.77, diff +6.5 and the band 0.8 to 10.2.
+- **"This week" in the detail is the point with `role: "selected"`**, not the last array element; the reason text for an unjudged location first used `weeks.length - 1` as the history weeks (the history response has no `history_weeks` field); **superseded by the review fix below**.
+- **The note under the table** ("The normal range shown is the selected week's; earlier weeks are not judged against it here.") is the "chart note" of R11; CP3b reuses it. The first wording failed R11's phrase ("the selected week's") and was reworded, not the test.
+- **The detail heading is the location name only** and the verdict line says "Selected week <date>" (not "Week of <date>"), so `getByText("Week of 2026-07-20")` in the App tests still finds exactly one element.
+
+**CP3a mutation checks (the plan names none; each applied alone, reverted, `cmp` against a backup).** (o) the detail shows the raw band instead of `displayBand`: R10. (p) `WeeksTable` reverses the weeks: R11. (q) the detail hides the data-quality warning: R9 (location). (s) "This week" takes the first week's total instead of the selected one: R11. None survived.
+
+## Deviations (CP3a review)
+
+- **Fix: `history_weeks` comes from the report row.** `LocationDetail` had derived `history_weeks` as `weeks.length - 1`, the UI computing something the API already gives (the location's row in `/api/report`, which is loaded, has `history_weeks`). `LocationDetail` now takes a `historyWeeks` prop (`number | null`), and `ReportView` passes the selected row's `history_weeks`. Tests first (red, then green): **R17** (component) with a not_enough_history history whose window has 13 weeks, `historyWeeks` 5 and `min_history_weeks` 8: the detail shows "5 of 8" and not "12 of 8" (so `weeks.length - 1` would fail it); **R17** (end to end) the same through a cloned report row and history, `<App />`. The existing detail tests pass `historyWeeks={12}` (the full windows of T3 S6 and S16). Mutation: restoring `weeks.length - 1` makes both R17 tests fail.
+- **Order and cut order (John's call, resolving Q10):** next is CP3b (SVG chart), then CP3c with the glossary first and the CSS last. Cut order if ever needed: the CSS, then the glossary; the chart is not a cut item. John does not expect to cut anything. This supersedes the earlier "CP3b first to be cut, CP3c second" and the earlier "CP3c after CP3a and before CP3b".
 
