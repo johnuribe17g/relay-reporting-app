@@ -88,3 +88,31 @@ export function reasonText(
       return null;
   }
 }
+
+/** A parameter as written in the copy: `2`, `2.5`, `12` (no rounding, so the text always matches the setting). */
+const param = (value: number): string => String(value);
+
+export interface Glossary {
+  median: string;
+  range: string;
+  z: string;
+  diff: string;
+  tooQuiet: string;
+  notEnoughHistory: string;
+}
+
+/**
+ * One-line definitions of the numbers on the screen. Every number in them comes from `report.parameters`,
+ * never from a literal (plans/T4-frontend.md §4, CP3c). Shown in the glossary and as the table headers' title.
+ */
+export function glossary(parameters: Parameters): Glossary {
+  return {
+    median: `The middle value of the weekly totals over up to the last ${param(parameters.baseline_weeks)} weeks: half the weeks were above it, half below.`,
+    range:
+      "Totals inside it count as normal; a total at an edge or outside it is flagged. It comes from the median and how much the weeks usually vary.",
+    z: `How unusual this week is, in units of typical week-to-week variation. 0 is exactly normal; a week is flagged from \u00b1${param(parameters.z_min)}, and only if the difference is at least ${param(parameters.min_abs)} events.`,
+    diff: "This week's total minus the median.",
+    tooQuiet: `The normal week has fewer than ${param(parameters.min_baseline_median)} events, too few to judge a quiet week.`,
+    notEnoughHistory: `Fewer than ${param(parameters.min_history_weeks)} weeks of data, too few to judge.`,
+  };
+}

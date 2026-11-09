@@ -88,7 +88,9 @@ export function WeekChart({ data }: { data: History }) {
             fill={SERIES}
             stroke={SURFACE}
             strokeWidth={2}
-          />
+          >
+            <title>{`${point.week}: ${point.total} events${point.role === "selected" ? " (selected week)" : ""}`}</title>
+          </circle>
         ))}
         {data.weeks.map((point, i) =>
           point.role === "selected" ? (

@@ -41,16 +41,26 @@ export function LocationDetail({
       </p>
       {reason !== null && <p>{reason}</p>}
       <dl>
-        <dt>This week</dt>
-        <dd>{fmtNum(selected?.total ?? null)}</dd>
-        <dt>Normal (median)</dt>
-        <dd>{baseline === null ? "—" : fmtNum(baseline.median)}</dd>
-        <dt>Normal range</dt>
-        <dd>{baseline === null ? "—" : `${fmtBand(baseline)} (the edges count as unusual)`}</dd>
-        <dt>Score (z)</dt>
-        <dd>{fmtZ(data.z)}</dd>
-        <dt>Difference</dt>
-        <dd>{fmtDiff(data.diff)}</dd>
+        <div>
+          <dt>This week</dt>
+          <dd>{fmtNum(selected?.total ?? null)}</dd>
+        </div>
+        <div>
+          <dt>Normal (median)</dt>
+          <dd>{baseline === null ? "—" : fmtNum(baseline.median)}</dd>
+        </div>
+        <div>
+          <dt>Normal range</dt>
+          <dd>{baseline === null ? "—" : `${fmtBand(baseline)} (the edges count as unusual)`}</dd>
+        </div>
+        <div>
+          <dt>Score (z)</dt>
+          <dd>{fmtZ(data.z)}</dd>
+        </div>
+        <div>
+          <dt>Difference</dt>
+          <dd>{fmtDiff(data.diff)}</dd>
+        </div>
       </dl>
       {baseline !== null && <p>This week&apos;s total, {baselineSentence(baseline.weeks_used)}.</p>}
       {data.data_quality.unknown_events_in_window > 0 && (

@@ -24,7 +24,7 @@ export interface ChartGeometry {
   xs: number[];
   /** y of each point; the Y axis starts at 0. */
   ys: number[];
-  /** Top of the Y axis: covers the data and the band's top edge, and is at least 1. */
+  /** Top of the Y axis: covers the data and the band's top edge, a whole number (counts are integers), at least 1. */
   yMax: number;
   plot: { left: number; right: number; top: number; bottom: number };
   /** The shaded band over the full plot width, or null (no band, or no points). */
@@ -42,7 +42,7 @@ export function chartGeometry({ points, band, width, height, padding }: ChartInp
 
   const shown = band === null ? null : displayBand(band);
   const dataMax = points.reduce((max, point) => Math.max(max, point.total), 0);
-  const yMax = Math.max(dataMax, shown?.high ?? 0, 1);
+  const yMax = Math.max(Math.ceil(Math.max(dataMax, shown?.high ?? 0)), 1);
   const yOf = (value: number): number => top + innerHeight * (1 - value / yMax);
 
   if (points.length === 0) return { xs: [], ys: [], yMax, plot, bandRect: null };

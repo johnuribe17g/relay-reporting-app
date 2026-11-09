@@ -60,4 +60,15 @@ describe("chartGeometry (plan §2c C)", () => {
     expect(g.ys).toEqual([]);
     expect(g.bandRect).toBeNull();
   });
+
+  test("C7 yMax is rounded up to a whole number (counts are integers)", () => {
+    // totals [5,7], band 1..10.19: max(7, 10.19) = 10.19 -> ceil 11 (so the axis never prints 10.19)
+    // x = 10, 290; y = 10 + 80*(1 - v/11): 5 -> 53.636, 7 -> 39.091
+    // band: high 10.19 -> y = 10 + 80*(1 - 10.19/11) = 15.891; low 1 -> 10 + 80*(10/11) = 82.727; height 66.836
+    const g = chartGeometry({ ...layout, points: totals([5, 7]), band: { band_low: 1, band_high: 10.19 } });
+    expect(g.yMax).toBe(11);
+    expectClose(g.ys, [53.636, 39.091]);
+    expect(g.bandRect?.y).toBeCloseTo(15.891, 3);
+    expect(g.bandRect?.height).toBeCloseTo(66.836, 3);
+  });
 });

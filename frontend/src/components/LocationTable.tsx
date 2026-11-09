@@ -1,5 +1,5 @@
 import type { LocationRow, Parameters } from "../api/types";
-import { fmtBand, fmtDiff, fmtNum, fmtZ, reasonText, verdictLabel } from "../format";
+import { fmtBand, fmtDiff, fmtNum, fmtZ, glossary, reasonText, verdictLabel } from "../format";
 
 /**
  * Rows exactly in the order the API gave (its ranking: judged by deviation, unjudged after). No sorting,
@@ -16,6 +16,7 @@ export function LocationTable({
   selected: string | null;
   onSelect: (location: string) => void;
 }) {
+  const help = glossary(parameters);
   return (
     <table>
       <caption>Locations, in the order the API ranks them</caption>
@@ -24,10 +25,18 @@ export function LocationTable({
           <th scope="col">Location</th>
           <th scope="col">Verdict</th>
           <th scope="col">This week</th>
-          <th scope="col">Normal (median)</th>
-          <th scope="col">Normal range</th>
-          <th scope="col">Score (z)</th>
-          <th scope="col">Difference</th>
+          <th scope="col" title={help.median}>
+            Normal (median)
+          </th>
+          <th scope="col" title={help.range}>
+            Normal range
+          </th>
+          <th scope="col" title={help.z}>
+            Score (z)
+          </th>
+          <th scope="col" title={help.diff}>
+            Difference
+          </th>
         </tr>
       </thead>
       <tbody>

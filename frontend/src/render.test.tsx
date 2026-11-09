@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import App from "./App";
 import type { History, LocationRow, Report, Verdict } from "./api/types";
 import { AccountSummary } from "./components/AccountSummary";
+import { Glossary } from "./components/Glossary";
 import { LocationDetail } from "./components/LocationDetail";
 import { LocationTable } from "./components/LocationTable";
 import a15History from "./test/fixtures/a15-history-siteC-0720.json";
@@ -306,11 +307,55 @@ describe("location detail (plan §2f, CP3a)", () => {
     expect(points[12]).toBe(selected[0]);
     expect(points.slice(0, 12).every((p) => p.getAttribute("data-role") === "baseline")).toBe(true);
     expect(Number(selected[0]?.getAttribute("r"))).toBeGreaterThan(Number(points[0]?.getAttribute("r")));
+    // native hover: a <title> in each point (no JS tooltip); the first total is 5 (T3 S6), the selected is 12
+    expect(selected[0]?.querySelector("title")?.textContent).toBe("2026-07-20: 12 events (selected week)");
+    expect(points[0]?.querySelector("title")?.textContent).toBe("2026-04-27: 5 events");
     expect(svg.querySelectorAll('rect[data-chart="band"]')).toHaveLength(1);
     const labels = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
     expect(labels).toEqual(expect.arrayContaining(["0", "12", "2026-04-27", "2026-07-20"]));
     expect(labels.filter((t) => t === "12")).toHaveLength(2); // the Y maximum and the selected total
     expect(within(region).getByRole("table", { name: "Weekly totals" })).toBeInTheDocument();
+  });
+
+  test("R14 the glossary follows report.parameters; the same text is the header title", () => {
+    const report = clone(a15Report);
+    // the real fixture values (z_min 2, min_abs 3, baseline_weeks 12) give the phrases the clone must lose
+    const { unmount } = render(<Glossary parameters={report.parameters} />);
+    expect(screen.getByText("What do these numbers mean?").closest("details")).not.toBeNull();
+    const real = document.body.textContent ?? "";
+    expect(real).toContain("from ±2,");
+    expect(real).toContain("at least 3 events");
+    expect(real).toContain("last 12 weeks");
+    unmount();
+
+    report.parameters.z_min = 2.5;
+    report.parameters.min_abs = 4;
+    report.parameters.baseline_weeks = 9;
+    report.parameters.min_baseline_median = 5;
+    report.parameters.min_history_weeks = 6;
+    const { unmount: unmountGlossary } = render(<Glossary parameters={report.parameters} />);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("from ±2.5,");
+    expect(text).toContain("at least 4 events");
+    expect(text).toContain("last 9 weeks");
+    expect(text).toContain("fewer than 5 events");
+    expect(text).toContain("Fewer than 6 weeks");
+    expect(text).not.toContain("from ±2,");
+    expect(text).not.toContain("at least 3 events");
+    expect(text).not.toContain("last 12 weeks");
+    unmountGlossary();
+
+    table(report); // the header titles carry the same one-line definitions
+    expect(screen.getByRole("columnheader", { name: "Score (z)" })).toHaveAttribute(
+      "title",
+      expect.stringContaining("from ±2.5,"),
+    );
+    expect(screen.getByRole("columnheader", { name: "Normal (median)" })).toHaveAttribute(
+      "title",
+      expect.stringContaining("last 9 weeks"),
+    );
+    expect(screen.getByRole("columnheader", { name: "Normal range" })).toHaveAttribute("title");
+    expect(screen.getByRole("columnheader", { name: "Difference" })).toHaveAttribute("title");
   });
 
   test("R15 a history with no baseline (not judged) has no chart, only the table", () => {

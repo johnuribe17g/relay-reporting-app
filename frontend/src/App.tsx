@@ -4,6 +4,7 @@ import { getAccounts, getHistory, getReport, getWeeks } from "./api/client";
 import type { History, Report } from "./api/types";
 import { AccountSwitcher } from "./components/AccountSwitcher";
 import { ErrorBox } from "./components/ErrorBox";
+import { Glossary } from "./components/Glossary";
 import { LocationDetail } from "./components/LocationDetail";
 import { AccountSummary } from "./components/AccountSummary";
 import { LocationTable } from "./components/LocationTable";
@@ -174,6 +175,7 @@ function ReportView({
   return (
     <>
       <AccountSummary report={report} />
+      <Glossary parameters={report.parameters} />
       <section>
         <h3>Locations</h3>
         <LocationTable
