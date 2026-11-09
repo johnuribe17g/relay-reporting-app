@@ -82,7 +82,7 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval   | T1 plan approved (it becomes the template); first use in T2                      | built at T1 close           |
   | PreToolUse hook blocking writes to `data/`                                                                            | T1 touches seed and migrations, so the CLAUDE.md rule becomes a guarantee now    | planned, in T1 plan         |
   | Hook protecting already-applied migrations                                                                            | First migration merged to main                                                   | replaced by deny rules (T1) |
-  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | built at T2 close                       |
+  | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | built at T2 close           |
   | `/close-ticket` command: verifies, ticks the plan checklist, drafts the PR description, lists my steps                | Closing T1 by hand made the steps concrete; built then instead of waiting for T2 | built after T1              |
 
 - Not building tooling upfront on purpose: a command derived from a plan that already
@@ -182,3 +182,63 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   (the view's SQL and zoneinfo in weeks.py) and could diverge; they agree on the seed (A5).
 - Weak spot: its last-complete-week check isn't blind, because PLAN §2 states 2026-07-20 and it
   didn't flag that.
+
+## 2026-11-09 — T3 pre-plan context
+
+- Gave the agent my T3 decisions upfront (thin endpoints over a shared service module, so the
+  backtest tests the code the API serves; X-Account-Id with a demo default; injectable as-of;
+  GET /api/accounts as a gap in PLAN §6; one band in the history chart; backtest ceiling fixed
+  before the first run) and asked it to challenge them. It kept all nine.
+- Rejected: a location absent at W returning 200 `no_activity`. In T2, `no_activity` means
+  "account has no events at all" (precedence 1). Reusing it would change what the verdict means,
+  and a 200 for a location that only starts after W leaks future data. It's 404, per the T2
+  existence rule.
+- Caught a misdiagnosis: it proposed "replacing the hardcoded 2026-07-20" in aggregation-reviewer.md.
+  There is no hardcoded date there; the reviewer gets it from PLAN §2, which it must read. Asked
+  it to check the file. The real fix: the reviewer derives each account's last complete week from
+  max(occurred_at) in the account's timezone and treats any week date in PLAN as unverified.
+- Caught a contradiction: "judgeable weeks only" plus "early weeks return not_enough_history if
+  asked by date" conflicted with my 422-outside-range decision. Made it pick one (422) and define
+  account 20 and late-starting accounts exactly (weeks=[], default_week=null, 200 no_activity /
+  not_enough_history), with no "or".
+- Test isolation: asked it to read conftest.py before proposing "seed relay_test once per
+  session". It found its own proposal would collide with the TRUNCATEs in the seed tests, and
+  switched to the test_seed_anchors.py pattern (module-scoped seeded connection, rolled back).
+  Same class of mistake I caught in T1's plan; this time it caught it itself once pointed at the code.
+- Kept the Vite proxy target out of T3: it depends on how T4 runs the frontend.
+- To check in the draft: first judgeable week is 2026-03-30 (T2 anchor A4), what `week` holds in
+  the report when default_week is null, and get_conn listed as a new dependency (health keeps the engine).
+- Used claude.ai chat to review the agent's pre-plan replies against the repo before answering.
+
+## 2026-11-09 — T3 implementation
+- CP3 mutations: (d) survived. My expectation was wrong: H8 uses Site A, which exists at 02-09,
+  so the order of the week and location checks can't matter for it. The agent explained why and
+  added H8b (Late, absent and not selectable → 422). Same lesson as the T2 HAVING check.
+- (a) exposed that the exists-at-W rule is enforced twice (fetch_series omits the location,
+  build_history turns that into a 404). Kept both.
+- Verified B2's 3 unjudged locations independently in psql (account 6, baseline 03-09 … 05-25):
+  medians Site C 3.0, Site H 3.5, Site O 3.5, all below min_baseline_median 4 → too_quiet is
+  right. At 07-20 only Site M is too_quiet because the window is different.
+- Checked account 12 (10 of 55 location flags, all higher) in psql: account totals are flat
+  (32–68, no direction), so I ruled out "trend lag" before letting it into D-23. Cause at
+  location level left uninvestigated and said so.
+- D-23 cross-check: account 6's flag at 06-08 was already in the data profile (§11, 102 vs 76),
+  written before any code.
+- Reviewer edit: caught that the quoted curl examples wouldn’t match the prefix permission, so every report/history call would have prompted. Switched to -G -d with an unquoted URL.”
+- T3 review: the reviewer derived the last complete week blind (all 6 zones → 2026-07-20) and
+  checked PLAN's dates against the data. That fixes the T2 weak spot. ~190 endpoint values
+  matched its SQL. I recomputed its two new cases by hand (Site N z −1.0117 at the min_abs
+  boundary, Site G z 17.705); both added as anchors.
+- Gap: series.py wasn't in its allowed reads (in T2 either), so zero-fill was checked through
+  outputs only. Added for next time.
+- For T4: band_low can be negative (Site G −1.43); clip at 0 when drawing it.
+- Agent found that DEMO_ACCOUNT_ID never reached the container, the same bug as T2’s REPORT_*. It recorded it instead of fixing it outside the plan’s scope. I approved the fix in T3, verified end to end.
+
+## 2026-11-09 — T3 close
+
+- /close-ticket: 10/11 ticked by the agent. It left the reviewer item for me because I hadn't
+  said I compared. I had (Site N/G by hand, B2 in psql) and ticked it with that evidence.
+- Decision log: rejected a D-24 for a field name (folded into D-16) and a D-27 for things
+  already in plan Q7/Q10. Filled the agent's TODO(john) gaps in D-24/D-25 with my actual reasons
+  instead of letting it invent them.
+- T3 numbers: 274 tests, backtest 4.93 % (8 % ceiling, not tuned), reviewer ~190 values matched.
