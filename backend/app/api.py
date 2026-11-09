@@ -3,11 +3,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from app.deps import Account, Bounds, get_bounds, get_conn, get_current_account, get_judge_params
 from app.domain.models import JudgeParams
-from app.report import build_history, build_report, build_weeks
+from app.report import build_accounts, build_history, build_report, build_weeks
 from app.schemas import AccountOut, History, Report, WeeksOut
 
 router = APIRouter(prefix="/api")
@@ -23,8 +23,7 @@ WeekQuery = Annotated[str | None, Query()]
 @router.get("/accounts")
 def list_accounts(conn: Conn) -> list[AccountOut]:
     """Every account, for the demo switcher. The one endpoint that is not account-scoped."""
-    rows = conn.execute(text("SELECT id, name, timezone FROM accounts ORDER BY id")).all()
-    return [AccountOut(id=r[0], name=r[1], timezone=r[2]) for r in rows]
+    return build_accounts(conn)
 
 
 @router.get("/weeks")

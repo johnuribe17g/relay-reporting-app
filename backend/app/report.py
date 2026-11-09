@@ -24,7 +24,7 @@ from app.schemas import (
     WeekPoint,
     WeeksOut,
 )
-from app.series import fetch_account_start, fetch_series, history_and_x
+from app.series import fetch_account_start, fetch_accounts, fetch_series, history_and_x
 
 
 def weeks_range(start: date | None, last: date | None, min_history_weeks: int) -> list[date]:
@@ -160,6 +160,10 @@ def _empty_summary(verdict: Verdict) -> Summary:
         by_type=None,
         data_quality=DataQuality(unknown_events_in_window=0),
     )
+
+
+def build_accounts(conn: Connection) -> list[AccountOut]:
+    return [AccountOut(id=a.id, name=a.name, timezone=a.timezone) for a in fetch_accounts(conn)]
 
 
 def build_weeks(

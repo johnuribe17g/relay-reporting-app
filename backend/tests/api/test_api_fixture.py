@@ -97,8 +97,8 @@ def test_w5_no_header_uses_the_demo_account(
     assert api.get("/api/weeks").json() == api.get("/api/weeks", headers=hdr(1)).json()
 
 
-def test_w6_unknown_demo_account_is_404(api: TestClient) -> None:
-    assert settings.demo_account_id == 15  # not in this fixture
+def test_w6_unknown_demo_account_is_404(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "demo_account_id", 999)
     response = api.get("/api/weeks")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "account_not_found"
