@@ -385,3 +385,21 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 
 - S2 approved; the S11 deviation accepted (anthropic + key → mock until S6). In review: log truncation, a single SummaryReason type.
 - S3: PLAN §13 says all 15 of account 6’s locations flag on 2026-06-01; the seed says 12. Tests count from /api/report instead of hard-coding it; PLAN.md left as written, README will say 12.
+
+## 2026-11-09 — T5 S6: real provider, manual run
+
+- Config: SUMMARY_PROVIDER=anthropic, model claude-haiku-5-5, effort low, key in .env (not shown;
+  removed after the run). The claude-api skill corrected the plan's guesses: the anthropic-version
+  header, thinking counting toward max_tokens (300 → 1024), the answer read by block type.
+- Account 15, 2026-07-20: source ai, reason null, ~1.1 s. Headline: "Account activity is normal
+  overall, but Site C is higher than usual and is the place to look first." Fact lines identical
+  to the template.
+- Account 6, 2026-06-01 (spike): source ai, ~2.6 s. Headline: "Activity is higher than usual
+  across the whole account rather than in one place, so start with Site N, which shows the largest
+  gap." The model reordered the location lines (Site N first). 12 flagged + 3 not judged = 15,
+  confirming that PLAN §13's "all 15" is wrong.
+- Caught: "the largest gap" is a comparative the validator doesn't check, and the model only saw
+  5 of the 12 flagged locations. True among the listed ones, unverified beyond them. Added to D-29's
+  limits rather than adding a rule: numbers still come only from the server.
+- Before the run I asked for provider error messages in the log (type only would have made a 400
+  undebuggable). Not needed this time; no fallback occurred.
