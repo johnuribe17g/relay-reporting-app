@@ -228,3 +228,63 @@ def test_s13_no_unknown_event_types_in_the_seed(api: TestClient, account: int) -
     body = api.get("/api/report", headers=hdr(account)).json()
     assert body["account_summary"]["data_quality"] == {"unknown_events_in_window": 0}
     assert all(row["data_quality"] == {"unknown_events_in_window": 0} for row in body["locations"])
+
+
+def test_s15_reviewer_case_zero_week_in_baseline_and_diff_on_the_min_abs_boundary(
+    api: TestClient,
+) -> None:
+    """Reviewer-sourced (T3 aggregation-reviewer): account 6 Site N, week 2026-04-27.
+
+    History 02-02 .. 04-20: 6,4,8,0,8,8,5,6,3,8,1,8 (the 0 is 02-23), x = 3.
+    Sorted 0,1,3,4,5,6,6,8,8,8,8,8 -> median (6+6)/2 = 6.
+    |dev| 0,2,2,6,2,2,1,0,3,2,5,2 -> sorted 0,0,1,2,2,2,2,2,2,3,5,6 -> MAD (2+2)/2 = 2.
+    spread = max(1.4826*2 = 2.9652, sqrt(6) = 2.449, 1) = 2.9652;
+    diff = 3 - 6 = -3 (|diff| = min_abs), z = -3/2.9652 = -1.0117 (|z| < 2) -> normal.
+    Band: h = max(2*2.9652, 3) = 5.9304 -> (0.0696, 11.9304).
+    """
+    body = api.get(
+        "/api/locations/Site%20N/history", params={"week": "2026-04-27"}, headers=hdr(6)
+    ).json()
+    totals = [w["total"] for w in body["weeks"]]
+    assert totals == [6, 4, 8, 0, 8, 8, 5, 6, 3, 8, 1, 8, 3]
+    assert body["weeks"][0]["week"] == "2026-02-02"
+    assert body["weeks"][3]["week"] == "2026-02-23"
+    spread = 1.4826 * 2
+    assert body["verdict"] == "normal"
+    assert body["baseline"]["median"] == 6.0
+    assert body["baseline"]["mad"] == 2.0
+    assert body["baseline"]["spread"] == pytest.approx(spread)
+    assert body["diff"] == -3.0
+    assert body["z"] == pytest.approx(-3 / spread)  # -1.0117
+    assert body["baseline"]["band_low"] == pytest.approx(6 - 2 * spread)  # 0.0696
+    assert body["baseline"]["band_high"] == pytest.approx(6 + 2 * spread)  # 11.9304
+
+
+def test_s16_reviewer_case_location_in_the_spike_week_with_a_zero_week_in_the_baseline(
+    api: TestClient,
+) -> None:
+    """Reviewer-sourced (T3 aggregation-reviewer): account 6 Site G, week 2026-06-01.
+
+    History 03-09 .. 05-25: 3,5,7,8,2,0,2,6,4,3,7,5 (the 0 is 04-13), x = 57.
+    Sorted 0,2,2,3,3,4,5,5,6,7,7,8 -> median (4+5)/2 = 4.5.
+    |dev| 1.5,.5,2.5,3.5,2.5,4.5,2.5,1.5,.5,1.5,2.5,.5
+    -> sorted .5,.5,.5,1.5,1.5,1.5,2.5,2.5,2.5,2.5,3.5,4.5
+    -> MAD (1.5+2.5)/2 = 2.
+    spread = max(2.9652, sqrt(4.5) = 2.121, 1) = 2.9652; diff = 52.5,
+    z = 52.5/2.9652 = 17.7054 -> higher.
+    Band: h = 5.9304 -> band_low = 4.5 - 5.9304 = -1.4304 (not clipped at 0).
+    """
+    body = api.get(
+        "/api/locations/Site%20G/history", params={"week": "2026-06-01"}, headers=hdr(6)
+    ).json()
+    totals = [w["total"] for w in body["weeks"]]
+    assert totals == [3, 5, 7, 8, 2, 0, 2, 6, 4, 3, 7, 5, 57]
+    assert body["weeks"][5]["week"] == "2026-04-13"
+    spread = 1.4826 * 2
+    assert body["verdict"] == "higher"
+    assert body["baseline"]["median"] == 4.5
+    assert body["baseline"]["mad"] == 2.0
+    assert body["diff"] == 52.5
+    assert body["z"] == pytest.approx(52.5 / spread)  # 17.7054
+    assert body["baseline"]["band_low"] == pytest.approx(4.5 - 2 * spread)  # -1.4304
+    assert body["baseline"]["band_high"] == pytest.approx(4.5 + 2 * spread)  # 10.4304
