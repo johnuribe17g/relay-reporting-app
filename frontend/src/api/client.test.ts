@@ -19,6 +19,13 @@ function reply(body: unknown, status = 200): Response {
   });
 }
 
+/** A fetch that, like the real one, rejects with the signal's reason when aborted. */
+function rejectOnAbort(_url: string, init?: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+  });
+}
+
 function lastCall(): { url: string; headers: Record<string, string> } {
   const call = fetchMock.mock.calls.at(-1) as [string, RequestInit | undefined];
   return { url: call[0], headers: (call[1]?.headers ?? {}) as Record<string, string> };
@@ -96,15 +103,42 @@ describe("client (plan §2d)", () => {
     expect((err as ApiError).message).toContain("502");
   });
 
-  test("K8 a rejected fetch is a network_error; an abort is rethrown untouched", async () => {
+  test("K8 a rejected fetch is a network_error; an abort (by signal) is rethrown untouched", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     const net = await getAccounts().catch((e: unknown) => e);
     expect(net).toBeInstanceOf(ApiError);
     expect((net as ApiError).code).toBe("network_error");
 
-    const abort = new DOMException("aborted", "AbortError");
-    fetchMock.mockRejectedValueOnce(abort);
-    const err = await getAccounts().catch((e: unknown) => e);
-    expect(err).toBe(abort);
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce(rejectOnAbort);
+    const pending = getAccounts(controller.signal).catch((e: unknown) => e);
+    controller.abort();
+    const err = await pending;
+    expect(err).not.toBeInstanceOf(ApiError);
+    expect((err as DOMException).name).toBe("AbortError");
+  });
+
+  test("K9 a 200 with a non-JSON body (Vite's index.html when the proxy is off) is an unexpected_response", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("<!doctype html><html></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+    const err = await getWeeks("15").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(200);
+    expect((err as ApiError).code).toBe("unexpected_response");
+  });
+
+  test("K10 an abort is decided by the signal: a custom reason is not an ApiError", async () => {
+    const controller = new AbortController();
+    const reason = new Error("superseded");
+    fetchMock.mockImplementationOnce(rejectOnAbort);
+    const pending = getReport("15", null, controller.signal).catch((e: unknown) => e);
+    controller.abort(reason);
+    const err = await pending;
+    expect(err).toBe(reason);
+    expect(err).not.toBeInstanceOf(ApiError);
   });
 });

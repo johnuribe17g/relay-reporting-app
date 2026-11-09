@@ -421,3 +421,44 @@ Details live in the linked PLAN.md / plans/ sections.
 - **Consequences:** `TestClient` runs the sync endpoints in a worker thread, and the single connection is used by one request at a time, so this is
   safe. A new test module must pick one of the two fixtures.
 - **Source:** [plans/T3-backend-api.md §2](../plans/T3-backend-api.md); `backend/tests/api/conftest.py`.
+
+## D-26: The frontend is a Vite dev server in docker-compose, not static files served by FastAPI
+- **Context:** D-13 wants a reviewer to need only Docker and make, so `make up` must bring up the whole app. T3 left open how the
+  browser reaches the API (no CORS).
+- **Decision:** a `web` service (`node:22-alpine`, `npm ci` in the image, the Vite dev server on `127.0.0.1:5173`) that proxies `/api` to
+  `api:8000`. The browser sees one origin, so the backend gets no CORS middleware and no change. `./frontend` is bind-mounted over `/app`,
+  and an anonymous volume keeps the image's `node_modules`; `make up` runs `up -V` so a changed `package.json` is never shadowed by an old
+  volume. Frontend checks run with `docker compose run --rm --no-deps web ...` so they do not start api and db.
+- **Alternatives:** `vite build` and serving `dist` from FastAPI (one origin and one container, but it couples the backend image to the
+  frontend build and loses HMR); installing `node_modules` outside `/app`, like the backend's `/opt/venv` (Vite's `fs.allow` may then refuse
+  files outside the project root; kept as the fallback); bind-mounting only `src` and the config files.
+- **Consequences:** the Vite dev server is a dev tool, not a production serving story (README, T6). Each `make up` leaves the previous
+  anonymous volume behind (11 to 13 volumes over two runs, measured in CP1a); `make reset` removes the current one, `docker volume prune` the
+  rest (it removes every unused volume of every project on the machine, not just this one). Docker also creates an empty `frontend/node_modules` directory on the host as the mount point; it is git-ignored and holds nothing.
+  `"node"` in `tsconfig` `types` makes `process` type-check in browser code too (known limit).
+- **Source:** [plans/T4-frontend.md §1a, §7 (Q4)](../plans/T4-frontend.md); [D-13](#d-13-the-whole-app-runs-under-docker-compose-from-t1).
+
+## D-27: URL reconciliation rules and the header-less bootstrap
+- **Context:** the URL holds `account`, `week` and `location` (PLAN §5) and any of them can be stale or hand-edited. The UI cannot know
+  the server's demo account (D-22) and must not hard-code 15.
+- **Decision:** three pure stages in `frontend/src/reconcile.ts`, each applied when the data it needs has arrived. Account: no param means a
+  header-less `/api/weeks`, and the account the server answered for is adopted into the URL (`replaceState`); a param that is not
+  `String(id)` of a listed account is an error state, with no request sent and no fallback. Week: not in `/api/weeks` (malformed, a
+  non-Monday, outside the range) falls back to `default_week` with a visible notice; no selectable weeks (account 20) removes the param.
+  Location: exact match against the report's rows, otherwise dropped, with no history request. Corrections use `replaceState`, user changes
+  `pushState` (an account change pushes `?account=B` alone, and B's default week is added by a `replaceState`), and `popstate` re-runs the
+  same path. A late response of a superseded request is ignored, and an aborted request never renders an error.
+- **Alternatives:** defaulting to the first listed account; falling back to the demo account on an unknown id (it would hide the error and
+  show another account's data); showing the API's 422 for a stale week (the UI already has the week list, so it would send a request that
+  can only fail); one `reconcile` over all data at once (the week and the location are only known after later requests).
+- **Consequences:** the request waterfall is sequential on purpose. With an `account` param: `/api/accounts` first, then `/api/weeks` only if
+  `reconcileAccount` returns `ok` (an unknown id never reaches an account-scoped endpoint), then `/api/report`, then
+  `/api/locations/{location}/history`. With no `account` param: `/api/accounts` and the header-less `/api/weeks` in parallel (there is no id to
+  validate), then report, then history. The account is only known to exist after `/api/accounts`; the week to request is only known after
+  `/api/weeks` (so no request carries a stale week and no 422 comes from a URL); the location is only known to exist after `/api/report` (so
+  no history request can 404 from a URL). The cost is four sequential round trips on a cold load with an `account` param (three without
+  one); at demo size each is milliseconds, and parallel guessing would send requests that can fail and need cleanup. The bootstrap makes
+  exactly one `/api/weeks` call. A missing header would silently select account 15 (D-22), so every request after the bootstrap carries it.
+- **Source:** [plans/T4-frontend.md §1c, §2b, §2e](../plans/T4-frontend.md); [D-20](#d-20-one-report-service-behind-thin-endpoints-injectable-inputs-one-error-shape);
+  [D-21](#d-21-selectable-weeks-are-per-account-and-judgeable-only-a-location-absent-at-w-is-a-404);
+  [D-22](#d-22-account-from-an-x-account-id-header-with-a-demo-default-account-15-get-apiaccounts-is-unscoped).

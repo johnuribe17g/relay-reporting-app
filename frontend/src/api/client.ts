@@ -25,28 +25,26 @@ function isErrorBody(body: unknown): body is { error: { code: string; message: s
   );
 }
 
-function isAbort(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
 async function request<T>(path: string, account: string | null, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = {};
   if (account !== null) headers["X-Account-Id"] = account;
 
+  // An abort is decided by the signal, never by the error's type or reason (realm-fragile, and
+  // abort(reason) can carry anything): if the signal is aborted, the original error goes up untouched.
   let response: Response;
   try {
     response = await fetch(path, { headers, signal });
   } catch (error) {
-    if (isAbort(error)) throw error;
+    if (signal?.aborted) throw error;
     throw new ApiError(0, "network_error", "Could not reach the API.");
   }
 
   if (!response.ok) {
-    let body: unknown;
+    let body: unknown = null;
     try {
       body = await response.json();
-    } catch {
-      body = null;
+    } catch (error) {
+      if (signal?.aborted) throw error;
     }
     if (isErrorBody(body)) {
       throw new ApiError(response.status, body.error.code, body.error.message);
@@ -57,7 +55,17 @@ async function request<T>(path: string, account: string | null, signal?: AbortSi
       `Unexpected response (HTTP ${response.status}).`,
     );
   }
-  return (await response.json()) as T;
+
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new ApiError(
+      response.status,
+      "unexpected_response",
+      `Unexpected response (HTTP ${response.status}): the body is not JSON.`,
+    );
+  }
 }
 
 /** Never sends the account header: the one endpoint that is not account-scoped (D-22). */
