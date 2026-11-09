@@ -101,3 +101,8 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   agent chooses to follow, and the rule the harness enforces.
 - Asked the agent to lint migrations (it had excluded migrations/versions from ruff) and
   to publish the api port on 127.0.0.1 only.
+- Verified the migrated table with \d in psql: matches schema.sql (no default on id, 
+  named constraints, composite index).
+- Migration 1 reviewed: tests written first (5 red → green). Agent caught SQLAlchemy's
+  implicit SERIAL on integer PKs (autoincrement=False) and fixed its own faithfulness
+  query instead of loosening the test. Verified the table with \d in psql.
