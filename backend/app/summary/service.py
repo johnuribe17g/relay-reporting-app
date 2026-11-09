@@ -8,7 +8,7 @@ from app.summary.claims import validate_summary
 from app.summary.errors import InvalidSummary
 from app.summary.facts import SummaryFacts, build_facts
 from app.summary.prompt import PROMPT_VERSION, build_prompt
-from app.summary.providers import Provider, ProviderTimeout
+from app.summary.providers import Provider, ProviderError, ProviderTimeout
 from app.summary.render import fact_lines, template_lines
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,13 @@ def summarize(report: Report, settings: SummarySettings, provider: Provider) -> 
     system, user = build_prompt(facts)
     try:
         raw = provider.complete(system, user)
-    except ProviderTimeout:
-        return _template(facts, provider, "timeout")
-    except Exception as exc:  # a provider must never turn into a 500; log the type only
+    except ProviderError as exc:
+        # Our own adapter messages (a status code, "timed out"): no key, no response body.
+        logger.warning("summary provider failed: %s: %s", type(exc).__name__, exc)
+        return _template(
+            facts, provider, "timeout" if isinstance(exc, ProviderTimeout) else "provider_error"
+        )
+    except Exception as exc:  # a provider must never turn into a 500; any other: the type only
         logger.warning("summary provider failed: %s", type(exc).__name__)
         return _template(facts, provider, "provider_error")
     try:

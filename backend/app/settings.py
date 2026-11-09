@@ -63,7 +63,8 @@ class SummarySettings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     summary_model: str = "claude-haiku-5-5"
     summary_timeout_seconds: float = Field(default=5.0, gt=0)
-    summary_max_tokens: int = Field(default=300, gt=0)
+    # Room for the JSON answer (a headline and up to six claims) plus the model's own thinking.
+    summary_max_tokens: int = Field(default=1024, gt=0)
     # Forces one failure in the mock, for tests and for seeing the fallback labels by hand.
     summary_mock_mode: MockMode = "ok"
 

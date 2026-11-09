@@ -11,7 +11,7 @@ from app.settings import MockMode, SummarySettings
 from app.summary.claims import validate_summary
 from app.summary.facts import build_facts
 from app.summary.prompt import build_prompt
-from app.summary.providers import MockProvider, Provider, select_provider
+from app.summary.providers import MockProvider, Provider, ProviderError, select_provider
 from app.summary.service import summarize
 from tests.summary import builders as b
 from tests.summary.test_render import F1_LINES, NO_FLAGS
@@ -95,8 +95,16 @@ def test_s8_edge_reports() -> None:
     assert spike.text.splitlines()[-1] == "More flagged locations not listed: 2."
 
 
-def test_s9_a_provider_never_causes_a_500() -> None:
-    assert summarize(b.f1(), ON, Recorder(error=KeyError("x"))).reason == "provider_error"
+def test_s9_a_provider_never_causes_a_500(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        assert summarize(b.f1(), ON, Recorder(error=KeyError("secret"))).reason == "provider_error"
+    # An unknown exception is logged by type only; a ProviderError by type and our own message.
+    assert "summary provider failed: KeyError" in caplog.text and "secret" not in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        out = summarize(b.f1(), ON, Recorder(error=ProviderError("HTTP 400 from the provider")))
+    assert out.reason == "provider_error"
+    assert "summary provider failed: ProviderError: HTTP 400 from the provider" in caplog.text
     assert summarize(b.f1(), ON, Recorder(result=None)).reason == "validation_failed"
 
 

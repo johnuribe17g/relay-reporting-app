@@ -115,6 +115,12 @@ def select_provider(settings: SummarySettings) -> Provider:
         if settings.anthropic_api_key is None:
             logger.warning("SUMMARY_PROVIDER=anthropic but no ANTHROPIC_API_KEY: using the mock")
         else:
-            # The real adapter is the optional last sub-step (S6); until it exists, the mock runs.
-            logger.warning("The anthropic adapter is not built yet: using the mock")
+            from app.summary.anthropic import AnthropicProvider  # avoids a circular import
+
+            return AnthropicProvider(
+                api_key=settings.anthropic_api_key.get_secret_value(),
+                model=settings.summary_model,
+                max_tokens=settings.summary_max_tokens,
+                timeout=settings.summary_timeout_seconds,
+            )
     return MockProvider(settings.summary_mock_mode)
