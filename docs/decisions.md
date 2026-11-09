@@ -462,3 +462,27 @@ Details live in the linked PLAN.md / plans/ sections.
 - **Source:** [plans/T4-frontend.md §1c, §2b, §2e](../plans/T4-frontend.md); [D-20](#d-20-one-report-service-behind-thin-endpoints-injectable-inputs-one-error-shape);
   [D-21](#d-21-selectable-weeks-are-per-account-and-judgeable-only-a-location-absent-at-w-is-a-404);
   [D-22](#d-22-account-from-an-x-account-id-header-with-a-demo-default-account-15-get-apiaccounts-is-unscoped).
+
+## D-28: Presentation in T4: plain CSS, a glossary built from the API's parameters, the chart kept
+- **Context:** the plan had styling out of T4 and the SVG chart as the first cut. Looking at the working screen,
+  the numbers alone did not answer "is this normal for us?" at a glance, and terms like median, normal range and
+  z-score are unfamiliar to most customer admins.
+- **Decision:** (1) one plain `styles.css` (~100 lines, no class names, `[data-verdict]` selectors, the dataviz
+  skill's surface/text tokens and status colors, checked with its validator in light mode); metrics as horizontal
+  stat tiles, the only markup change being `<div>` wrappers around `<dt>/<dd>` pairs. (2) A collapsed glossary
+  (`<details>`) above the location table, with the same one-line definitions as `title` on the table headers;
+  every number in it comes from `report.parameters`, never a literal. (3) The chart (13 weeks against the selected
+  week's band, native `<title>` per point, Y from 0 rounded up to a whole number) is no longer a cut item.
+  `higher` and `lower` share one flag color: the flag is direction-neutral (PLAN §2), the text says the direction.
+- **Alternatives:** Tailwind (a dependency, config and a lockfile change for one screen, no second use, PLAN §10);
+  no styling ("function over form" in the brief); `title` attributes only (not reachable by touch or keyboard);
+  a JS tooltip layer on the chart (the dataviz skill's default; the weeks table already carries the exact
+  numbers); a per-row sparkline in the location table (deferred: /api/report has no per-location series, so it
+  needs a backend change or one extra request per location); a chat over the data (rejected in D-10).
+- **Consequences:** the copy follows configuration (R6, R14), so a changed `REPORT_*` value never makes the
+  explanation contradict the rule. The glossary states a backend rule (edges count as unusual, D-17); if D-17
+  changes, the copy must change. A single flag color may read as "bad" for a week that is higher than usual,
+  which can be good news; a direction-specific treatment is an open product question (PLAN §12 #6). No dark mode,
+  no responsive redesign.
+- **Source:** [plans/T4-frontend.md §4 (CP3b, CP3c), Deviations](../plans/T4-frontend.md);
+  [notes.md, T4 scope changes](../ai-log/notes.md).
