@@ -30,6 +30,15 @@ doesn't exist or I haven't approved it, stop and ask.
 - Tests first for aggregation logic, using small fixtures with hand-computed expected values.
 - Don't commit unless I ask. Conventional commit messages (feat:, fix:, test:, docs:, chore:).
 - If something in the data or the spec is ambiguous, ask instead of guessing.
+- When a ticket makes a design decision with real alternatives, add an entry to docs/decisions.md in the same change.
 
 ## Commands
-(to be added as the project is scaffolded)
+Only Docker and make are needed. Everything runs in containers.
+- `make up`: build and start db + api (a one-shot `migrate` service applies migrations first)
+- `make down`: stop (keeps the DB volume). `make reset`: stop and drop the DB volume
+- `make migrate`: apply migrations. `make seed`: truncate and reload `data/seed.sql` (destructive, idempotent)
+- `make psql`: psql on the dev database. `make logs`: follow api logs
+- `make check`: the quality gate: `make lint` (ruff check + format check), `make typecheck` (mypy),
+  `make test` (pytest). Tests use their own databases (`relay_test`, `relay_migrations_test`), never the dev one
+- API: http://127.0.0.1:8000, `GET /api/health`
+- Stack as built: Python 3.12, uv (`backend/uv.lock`), psycopg 3, mypy, ruff
