@@ -1,6 +1,6 @@
 // Typed fetch client (plans/T4-frontend.md §1b). The account goes out only as the X-Account-Id header.
 
-import type { AccountOut, History, Report, WeeksOut } from "./types";
+import type { AccountOut, History, Report, SummaryOut, WeeksOut } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -25,15 +25,26 @@ function isErrorBody(body: unknown): body is { error: { code: string; message: s
   );
 }
 
-async function request<T>(path: string, account: string | null, signal?: AbortSignal): Promise<T> {
+async function request<T>(
+  path: string,
+  account: string | null,
+  signal?: AbortSignal,
+  body?: unknown,
+): Promise<T> {
   const headers: Record<string, string> = {};
   if (account !== null) headers["X-Account-Id"] = account;
+  const init: RequestInit = { headers, signal };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    init.method = "POST";
+    init.body = JSON.stringify(body);
+  }
 
   // An abort is decided by the signal, never by the error's type or reason (realm-fragile, and
   // abort(reason) can carry anything): if the signal is aborted, the original error goes up untouched.
   let response: Response;
   try {
-    response = await fetch(path, { headers, signal });
+    response = await fetch(path, init);
   } catch (error) {
     if (signal?.aborted) throw error;
     throw new ApiError(0, "network_error", "Could not reach the API.");
@@ -95,4 +106,13 @@ export function getHistory(
 ): Promise<History> {
   const path = `/api/locations/${encodeURIComponent(location)}/history?week=${encodeURIComponent(week)}`;
   return request<History>(path, account, signal);
+}
+
+/** POST /api/summary. `week` null asks for the default week. Always sends the account header. */
+export function postSummary(
+  account: string,
+  week: string | null,
+  signal?: AbortSignal,
+): Promise<SummaryOut> {
+  return request<SummaryOut>("/api/summary", account, signal, { week });
 }

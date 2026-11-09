@@ -10,7 +10,7 @@ export type AsyncState<T> =
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: ApiError };
 
-function toApiError(error: unknown): ApiError {
+export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   return new ApiError(0, "unexpected_error", error instanceof Error ? error.message : "Unexpected error.");
 }

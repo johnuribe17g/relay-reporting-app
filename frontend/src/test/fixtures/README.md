@@ -17,6 +17,8 @@ curl -s -H 'X-Account-Id: 20' $B/weeks                                          
 curl -s -H 'X-Account-Id: 20' $B/report                                          > $F/a20-report.json
 curl -s -H 'X-Account-Id: 999' $B/weeks                                          > $F/err-account-not-found.json
 curl -s -H 'X-Account-Id: 15' "$B/report?week=2026-01-05"                        > $F/err-invalid-week.json
+# a15-summary-disabled.json: the AI summary flag must be off (the default); the key is the flag state
+curl -s -X POST -H 'X-Account-Id: 15' -H 'Content-Type: application/json' -d '{"week":"2026-07-20"}' $B/summary > $F/a15-summary-disabled.json
 ```
 
 Expected values in tests come from the plan's hand arithmetic (plans/T3 §2c, plans/T4 §2), never from these files.

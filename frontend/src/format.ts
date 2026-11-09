@@ -1,7 +1,7 @@
 // Render-time formatting and copy (plans/T4-frontend.md §1d). Floats are formatted only here, and nothing
 // here computes a statistic. `en-US` is fixed so output does not depend on the machine; a negative sign is
 // U+2212; negative zero is never shown.
-import type { BaselineOut, Parameters, Summary, Verdict } from "./api/types";
+import type { BaselineOut, Parameters, Summary, SummaryOut, Verdict } from "./api/types";
 
 const MINUS = "−";
 const EMPTY = "—";
@@ -115,4 +115,16 @@ export function glossary(parameters: Parameters): Glossary {
     tooQuiet: `The normal week has fewer than ${param(parameters.min_baseline_median)} events, too few to judge a quiet week.`,
     notEnoughHistory: `Fewer than ${param(parameters.min_history_weeks)} weeks of data, too few to judge.`,
   };
+}
+
+/** The card's label. A template response never gets the AI wording; mock output is never a model's. */
+export function summaryLabel(summary: Pick<SummaryOut, "source" | "reason" | "provider">): string {
+  if (summary.source === "ai") {
+    return summary.provider === "mock"
+      ? "AI summary · preview (mock provider)"
+      : "AI summary · preview (anthropic)";
+  }
+  return summary.reason === null
+    ? "Template summary"
+    : `Template summary — ${summary.reason.replace(/_/g, " ")}`;
 }

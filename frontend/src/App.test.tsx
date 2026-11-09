@@ -217,7 +217,10 @@ describe("App: URL state and the request waterfall (plan §2e)", () => {
       });
 
       // Account 6 has 15 locations (data profile §1); account 15's stale answer would show 3.
-      expect(screen.getAllByRole("button")).toHaveLength(15);
+      // The summary card's own button (T5) is not a location.
+      expect(
+        screen.getAllByRole("button", { name: (name) => name !== "Generate summary" }),
+      ).toHaveLength(15);
       expect(screen.getByRole("button", { name: "Site M" })).toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       expect(accountSelect()).toHaveValue("6");

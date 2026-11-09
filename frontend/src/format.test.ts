@@ -10,6 +10,7 @@ import {
   fmtNum,
   fmtZ,
   reasonText,
+  summaryLabel,
 } from "./format";
 
 const MINUS = "−";
@@ -91,5 +92,36 @@ describe("format (plan §2c F)", () => {
     expect(
       reasonText({ verdict: "higher", history_weeks: 12, baseline: baseline({}) }, params),
     ).toBeNull();
+  });
+});
+
+describe("summaryLabel (plans/T5-ai-summary.md §2e)", () => {
+  test("L1 ai + mock is a preview from the mock provider", () => {
+    expect(summaryLabel({ source: "ai", reason: null, provider: "mock" })).toBe(
+      "AI summary · preview (mock provider)",
+    );
+  });
+
+  test("L2 ai + anthropic", () => {
+    expect(summaryLabel({ source: "ai", reason: null, provider: "anthropic" })).toBe(
+      "AI summary · preview (anthropic)",
+    );
+  });
+
+  test("L3 a template says why", () => {
+    const label = (reason: "disabled" | "nothing_to_summarize" | "provider_error" | "timeout" | "validation_failed") =>
+      summaryLabel({ source: "template", reason, provider: "mock" });
+    expect(label("disabled")).toBe("Template summary — disabled");
+    expect(label("nothing_to_summarize")).toBe("Template summary — nothing to summarize");
+    expect(label("provider_error")).toBe("Template summary — provider error");
+    expect(label("timeout")).toBe("Template summary — timeout");
+    expect(label("validation_failed")).toBe("Template summary — validation failed");
+  });
+
+  test("L4 a template never gets the AI wording, whatever the provider", () => {
+    for (const provider of ["mock", "anthropic"] as const) {
+      const text = summaryLabel({ source: "template", reason: "disabled", provider });
+      expect(text).not.toMatch(/AI summary|preview/);
+    }
   });
 });

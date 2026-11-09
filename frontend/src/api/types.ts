@@ -91,3 +91,22 @@ export interface History {
   weeks: WeekPoint[];
   data_quality: DataQuality;
 }
+
+export type SummaryReason =
+  | "disabled"
+  | "nothing_to_summarize"
+  | "provider_error"
+  | "timeout"
+  | "validation_failed";
+
+export interface SummaryOut {
+  week: string | null;
+  /** Set only when `source` is "ai". */
+  headline: string | null;
+  /** The server-rendered fact lines, one per line. */
+  text: string;
+  source: "ai" | "template";
+  reason: SummaryReason | null;
+  provider: "mock" | "anthropic";
+  prompt_version: string;
+}
