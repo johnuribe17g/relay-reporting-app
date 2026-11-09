@@ -34,7 +34,7 @@ Details live in the linked PLAN.md / plans/ sections.
 - **Consequences:** older weeks are judged without future data (the "before the selected week" rule
   was accepted in session 02). The window, minimum history, `z_min` and `min_abs` are typed
   configuration, not constants. Defaults are sanity-checked by a lightweight backtest, not tuned.
-- **Source:** [PLAN.md §2, §10](../PLAN.md); [notes.md, session 02](../ai-log/notes.md); T2 plan (parameter values, pending).
+- **Source:** [PLAN.md §2, §10](../PLAN.md); [notes.md, session 02](../ai-log/notes.md); [D-14](#d-14-verdict-parameters-and-the-too_quiet-rule); [plans/T2-backend-core.md §1e–§1f](../plans/T2-backend-core.md).
 
 ## D-03: Complete weeks only, as-of anchored to the data
 - **Context:** the seed ends 2026-07-27 (a Monday, with 79 events), about 15 weeks before today, so
@@ -100,8 +100,8 @@ Details live in the linked PLAN.md / plans/ sections.
   change the view and nothing is reloaded. The brief also forbids modifying the seed.
 - **Consequences:** `clean_events` has 12,614 rows (12 fewer than the raw table), and account 6's spike
   week is 880 in the view versus 881 raw. The assumption that the 12 pairs are double-inserts is
-  unconfirmed (PLAN §12 #7: if they are legitimate, counts are 0.1% low). What happens to unknown
-  event types at query time is a T2 input.
+  unconfirmed (PLAN §12 #7: if they are legitimate, counts are 0.1% low). Unknown event types at query
+  time: see D-16.
 - **Source:** [PLAN.md §3](../PLAN.md); [plans/T1-scaffold-db.md §3, §9 (Q2, Q4, Q9)](../plans/T1-scaffold-db.md).
 
 ## D-07: Migration 1 stays faithful to `data/schema.sql`
@@ -137,8 +137,8 @@ Details live in the linked PLAN.md / plans/ sections.
   session 02); outcome- or duration-based metrics (about 3% NULL outcomes, and durations are unreliable,
   profile §5 and §9).
 - **Consequences:** many locations mean a few false flags per week even with good rules, which a single
-  conservative tier and a lightweight backtest mitigate (PLAN §13). Whether totals count only the 3
-  known event types, plus a visible data-quality warning when others appear, is a T2 decision.
+  conservative tier and a lightweight backtest mitigate (PLAN §13). Totals count only the 3 known
+  event types and unknown types are reported separately: see D-16.
 - **Source:** [PLAN.md §2, §4, §13](../PLAN.md); [notes.md, session 02](../ai-log/notes.md).
 
 ## D-09: Account 6's 2026-06-03 spike stays in as real data
@@ -219,3 +219,55 @@ Details live in the linked PLAN.md / plans/ sections.
   until T6.
 - **Consequences:** the run path is exercised on every ticket instead of being found broken in T6.
 - **Source:** [notes.md, "Before T1: run path"](../ai-log/notes.md); [plans/T1-scaffold-db.md §5, §7](../plans/T1-scaffold-db.md).
+
+## D-14: Verdict parameters and the `too_quiet` rule
+- **Context:** PLAN §2 names `z_min`, `min_abs` and "too quiet" but gives no values or definition. Location
+  medians over the 12 weeks before 2026-07-20 (69 locations, read from the seeded DB) run from 3 to 11 events
+  per week; by floor of the median: 3: 2 locations, 4: 8, 5: 11, 6: 16, 7: 11, 8: 9, 9: 9, 10: 2, 11: 1.
+- **Decision:** `z_min = 2.0`, `min_abs = 3`, `min_baseline_median = 4` (all `REPORT_*` settings). `min_abs` is the
+  smallest integer above PLAN's "2-event wobble". For a silent week (`x = 0`), `|z| = median / spread` and the spread is
+  at least `√median`, so a "lower" flag needs `median ≥ z_min²`: `z_min = 2` makes silence flaggable from median 4
+  (`z = −4/2 = −2.0`, `d = 4 ≥ 3`), while 2.5 would need 6.25 (at least 21 locations below it) and 3 would need 9
+  (57 below it). `too_quiet` means the baseline median is below 4 = `z_min²`: below that a silent week cannot reach
+  `z_min`, so "normal" would say nothing about silence. It is decided by the baseline median only, never by the
+  selected week's value. For 2026-07-20 it marks 2 of 69 locations (account 18 Site A, median 3; account 6 Site M, 3.5).
+- **Alternatives:** a higher `z_min` (silent weeks could not flag for most locations); deciding `too_quiet` from the
+  selected week; a fixed volume threshold unrelated to `z_min`; no `too_quiet` tier (a median of 3 would read "normal"
+  for any week, including silence).
+- **Consequences:** `min_baseline_median` is a separate setting, so it can drift from `z_min²` (a smaller value only
+  costs a verdict that can never fire). The floor of 1 in `spread` cannot fire with the default settings, because
+  `√median < 1` only for a median below 1 and `too_quiet` catches that first. The idealized flag rate
+  (Poisson, √median floor, MAD ignored) is about 3.4% per location-week at median 7, about 2.4 of 69 locations per
+  week. That is a sanity number, not a target; the T3 backtest checks the real rate and the defaults are not tuned.
+- **Source:** [PLAN.md §2](../PLAN.md); [plans/T2-backend-core.md §1f, §6 (Q3, Q5, Q9)](../plans/T2-backend-core.md).
+
+## D-15: Statistics in Python, SQL builds the zero-filled series; location existence and week bounds
+- **Context:** PLAN §10 wants pure domain logic and PLAN §2 wants zero-filled series, an injectable as-of and
+  baselines that never see future data. There is no locations table (profile §1, §6).
+- **Decision:** SQL only builds the weekly counts (`app/series.py`, over `clean_events.local_week`, with a
+  `generate_series` grid and `LEFT JOIN`); median, MAD, z, verdict and ranking are Python pure functions in
+  `app/domain/`. A location exists only through its events: it starts at its first event week, never before the first
+  complete week, and takes part in week W only if it starts on or before W. A location with 0 events in W stays in the
+  list. The reporting week comes from `last_complete_week(as_of, tz)` (the Monday of the local week containing as-of,
+  minus 7 days) and the first usable week from `first_complete_week(data_start, tz)`; both take injectable inputs
+  (defaults: `min`/`max(occurred_at)` over the view) and are the only time-zone code outside the view.
+- **Alternatives:** `percentile_cont` in SQL (two implementations of the statistics, one untestable without a
+  DB); the per-account `max(local_week) − 1` (drops the injectable clock and assumes the last week is always partial);
+  `min(local_week) + 1` for the start (assumes the first week is always partial); a `locations` table (not in the seed).
+- **Consequences:** the statistics are tested without a database. `first_complete_week` widens the time-zone code from
+  one function to two. A location whose only events are in the partial first week, or are of unknown types, still
+  exists (zero history); the seed has none. Data ending exactly at Sunday 23:59:59 leaves that week incomplete,
+  because a week is complete once its local Sunday is over.
+- **Source:** [PLAN.md §2, §10](../PLAN.md); [plans/T2-backend-core.md §1c, §1d, §6 (Q1, Q2, Q6, Q8)](../plans/T2-backend-core.md).
+
+## D-16: Unknown event types: not counted, reported separately
+- **Context:** the view passes unknown `event_type` values through (D-06), and a data-quality test fails on them
+  rather than the app dropping them silently. Whether they count toward "total events" was left to T2.
+- **Decision:** totals and the per-type breakdown count only `call_received`, `lead_created` and `appointment_set`.
+  Every weekly row also carries `unknown`, the count of events of other types in that week, so T3 can show a
+  data-quality warning. Nothing is dropped silently. A location with only unknown-type events still exists, with a
+  total of 0.
+- **Alternatives:** counting unknown types in the total (the metric would silently change meaning); filtering them
+  out in the view (hides them from the data-quality test and from the warning).
+- **Consequences:** the seed has none (profile §5), so no number changes today. T3 decides how the warning is shown.
+- **Source:** [plans/T1-scaffold-db.md §9 (Q9)](../plans/T1-scaffold-db.md); [plans/T2-backend-core.md §1d](../plans/T2-backend-core.md).
