@@ -1,15 +1,16 @@
 # AI interaction log
 
 ## Tools & division of labor
-- **Claude (claude.ai chat):** orientation before the work (phases, repo setup, the first
-  session's opening prompt). From T3 on, also a second reviewer on my side: I pasted the
-  agent's replies there and had it check them against the repo (read-only access to my local
-  clone) before I answered. Several T3 catches started there (the `no_activity` reuse, the
-  misdiagnosed reviewer fix, the quoted curl examples, the `fromisoformat` formats). It never
-  edited the repo. That conversation mixes in unrelated personal topics, so it isn't exported.
-- **Claude Code:** data profiling, planning with me, implementation, tests.
-  Exported raw per session below.
-- **Me:** scope and design decisions, reviewing every diff, README and reflection.
+- **Claude Code (Claude Sonnet 5.5):** data profiling, planning with me, implementation, tests, the
+  aggregation-reviewer subagent. Exported raw per session below. In T4 it used the `dataviz` skill for the chart
+  and the CSS colors, at its own suggestion and with my approval; it reported which rules it applied and which it
+  dropped because my instructions excluded them.
+- **Claude (claude.ai chat, Claude Opus 5.5):** orientation before the work (phases, repo setup, the first
+  session's opening prompt). Also a second reviewer on my side: I pasted the agent's replies there and
+  had it check them against the repo (read-only access to my local clone) before I answered, and it drafted the
+  prompts I then edited and sent. Several T3 and T4 catches started there. It never edited the repo. That
+  conversation mixes in unrelated personal topics, so it isn't exported.
+- **Me:** scope and design decisions, reviewing every diff, the browser checks, README and reflection.
 
 ## Sessions
 - [01-data-profiling.md](01-data-profiling.md) — profiling the seed data; corrected
@@ -43,6 +44,14 @@
   DEMO_ACCOUNT_ID never reaching the container (same bug as T2's REPORT_*).
 - [T3-aggregation-review.md](T3-aggregation-review.md) — reviewer derived the last complete
   week blind; ~190 endpoint values matched its SQL; two cases became anchors S15/S16.
+- [07-T4.md](07-T4.md) — T4 plan, implementation and close: Vite dev server in compose behind a proxy (no CORS),
+  typed client, URL state with three-stage reconciliation and a header-less bootstrap, summary, ranked table,
+  location detail, chart, glossary, minimal CSS. Plan review caught a circular expected value (R11), an unchecked
+  empty-DB assumption and a request-order contradiction. Caught in review: the proxy never verified, host
+  `node_modules`, `@types/node` 26 vs Node 22, a 200 HTML body and `abort(reason)` uncovered by tests, effect
+  dependencies left incomplete without ESLint, the UI deriving `history_weeks`. Mutation checks on every
+  checkpoint; one of mine was badly designed and the agent split it. Scope changes of mine: CSS, glossary, tile
+  layout, chart no longer cuttable.
 
 ## Reflection
 (written at the end, based on notes.md)

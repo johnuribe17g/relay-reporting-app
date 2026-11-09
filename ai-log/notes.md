@@ -242,3 +242,105 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   already in plan Q7/Q10. Filled the agent's TODO(john) gaps in D-24/D-25 with my actual reasons
   instead of letting it invent them.
 - T3 numbers: 274 tests, backtest 4.93 % (8 % ceiling, not tuned), reviewer ~190 values matched.
+
+## 2026-11-09 — T4 pre-plan context
+
+- Gave the agent my T4 decisions upfront (Vite dev server in compose, no state/router/fetch libraries, URL state,
+  no recomputation in the UI, hand-rolled SVG, global fetch stub, close verification) and asked it to challenge them.
+- It found cases my message missed: no `?account` at all (nothing exposes the server's demo default, and
+  hard-coding 15 would duplicate D-22), an account with events but no judgeable week, late responses overwriting
+  a newer account, the band clipped in the text and not only in the chart, and `new Date('2026-07-20')` rendering
+  as the 19th in US time zones.
+- Its proposal to mock the client module would have left the X-Account-Id logic untested. Agreed to stub global
+  fetch instead and keep the real client.
+- Decided: header-less bootstrap (adopt `account.id` from /api/weeks), unknown account = error state with no
+  fallback, no ESLint, no auto-select of a location.
+- Rejected a D-28 for hand-written types and the mock boundary: plan open questions, not ADRs (same call as in T3).
+- Asked for checkpoints with an explicit cut order, given the time left.
+
+## 2026-11-09 — T4 plan review
+
+- R11's expected row count was "confirmed at capture": the expected value came from the fixture under test.
+  Replaced with the calendar arithmetic (07-20 minus 12 weeks = 04-27, after 02-02, so 12 + 1 = 13).
+- The empty-DB case assumed a 404 without checking. Made it a CP1a probe that records the real status and body.
+- CP1 was one huge diff (run path + client + URL logic + App + docs). Split into CP1a (run path only) and CP1b.
+- After my D-27 edit, the plan said /api/accounts and /api/weeks "start together". That breaks A3: with
+  `?account=999` a parallel weeks call would carry the bad id. Fixed before committing the plan: parallel only
+  without an account param. The /plan-ticket self-check missed it, same as T2.
+
+## 2026-11-09 — T4 CP1a (run path)
+
+- The agent reported "make check green" and the versions, but had not checked the proxy, which is the whole point
+  of D-26. Asked for curl through :5173: /api/health 200, and /api/weeks with X-Account-Id: 6 returned account 6,
+  so the header passes through.
+- `frontend/node_modules` existed on the host, contradicting the plan. Two causes: `npm install
+  --package-lock-only` on the bind mount wrote `.package-lock.json`, and Docker recreates the empty mount point of
+  the anonymous volume. The lockfile is now generated in a throwaway copy; the plan sentence was corrected.
+- `@types/node` came in at 26 against the node:22 image. Pinned to ^22.
+- Empty-DB probe (before seeding): /api/accounts 200 `[]`, /api/weeks 404 `account_not_found`. No 500.
+- The agent found that `up -V` leaves the replaced anonymous volumes behind. Accepted as a known limit: the obvious
+  fix (`docker volume prune` in the Makefile) would delete other projects' volumes.
+- Checked the fixtures myself against the T3 anchors (Site C z 2.7716, band 0.8096–10.1904; Site G band_low
+  −1.4304; Site M too_quiet). HMR works on the macOS bind mount.
+
+## 2026-11-09 — T4 CP1b (client, URL logic, shell)
+
+- Stop point 1: mutations (a)–(e) all caught. (b) was caught only by the "015" case in RA3, which justifies having
+  it there.
+- Reviewing client.ts I found two cases no test covered: a 200 with an HTML body (Vite serves index.html for /api/*
+  if the proxy is off) threw a raw SyntaxError instead of an ApiError, and abort detection relied on the error type,
+  so `abort(reason)` would have shown a false network error. Added K9/K10; abort is now decided by
+  `signal.aborted`.
+- The agent then found that the old `instanceof DOMException` check already failed under jsdom (jsdom's and Node's
+  DOMException are different classes).
+- Committed stop point 1 separately so the fixes show up as their own diff (same reasoning as T2).
+- Stop point 2: mutations (f)–(i) caught.
+- Q3's mitigation for skipping ESLint said effects outside useAsync would stay trivial. App.tsx had two non-trivial
+  effects with incomplete dependency lists. Completed them (results memoized); same request counts in A1–A10. That
+  is the concrete cost of skipping ESLint.
+- StrictMode off: corrected the agent's reason. The cost of enabling it is only a duplicate aborted request in dev;
+  what we lose is its check for effects without cleanup.
+
+## 2026-11-09 — T4 CP2, CP3a, CP3b
+
+- CP2: mutations (j)–(m) caught. The agent tightened a selector in an approved test (`/^account/i` also matched the
+  new "Account summary" region); no assertion changed. Accepted.
+- CP3a: the detail derived `history_weeks` as `weeks.length - 1`. Correct today, but it is the UI computing what the
+  API already gives in the report row. Changed to use the row; test added for a not_enough_history clone.
+- CP3a: when R11 failed on a copy change, the agent reworded the copy, not the test.
+- CP3b: my mutation (t) was badly designed. As written, the chart clipped by itself, so the chart tests stayed green
+  and proved nothing. The agent split it: (t1) shows nothing; (t2) only displayBand stops clipping and C1 fails,
+  which proves the chart depends on it.
+- dataviz skill: the agent proposed it in the pre-plan; I approved it for CP3b and asked for a report of what it
+  applied and what it didn't. Applied: one series with no legend, mark specs, the band as a wash, selective labels,
+  validated palette. Not applied, following my rules over the skill: hover layer, gridlines, dark mode. It read
+  only part of the skill's files and said which, and it did not look at the rendered chart; I checked it in the
+  browser.
+
+## 2026-11-09 — T4 scope changes (mine)
+
+- Plain CSS in T4 (CP3c), against the plan's "Out: styling work". One styles.css, no Tailwind: one screen, and
+  Tailwind adds a dependency, config and a lockfile change for no second use.
+- A glossary (`<details>`), every number taken from `report.parameters`, never a literal; the same definitions as
+  `title` on the table headers. Many admins won't know what a z-score or a median is.
+- The chart is no longer a cut item. A chart of 13 weeks against the band shows outliers and streaks far better
+  than the numbers alone.
+- Metrics as horizontal tiles, the glossary above the location table. The only markup change allowed for styling:
+  `<div>` wrappers around `<dt>/<dd>` pairs.
+- Native `<title>` on chart points instead of a JS tooltip layer; yMax rounded up to a whole number.
+- Considered a per-row sparkline in the location table; deferred, since /api/report has no per-location series
+  (backend change or 15 extra requests).
+- Used claude.ai chat to review each agent reply against the repo before answering, as in T3.
+
+## 2026-11-09 — T4 close
+
+- /close-ticket ticked 9 of 10. It left my browser verification unticked because I hadn't reported it in that
+  session, and it flagged that it could not confirm I made two of the commits (3991b1d, dc45091) because I didn't
+  say so there. Both are mine.
+- Browser verification after `make reset && make up && make seed`: [(a)–(h): what I saw; note anything that
+  didn't match]. Before seeding: [what the page showed].
+- Numbers against curl (h): [which values I compared, e.g. account 15 Site C 12 / 5.5 / 0.8–10.2 / 2.77].
+- Decision log: added D-28 (presentation). No other entries: abort-by-signal and the effect dependencies are
+  implementation fixes, recorded in the plan's deviations.
+- T4 numbers: [backend 274, frontend N] tests, mutations (a)–(y) all caught except my badly designed (t), which
+  the agent split.

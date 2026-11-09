@@ -1,0 +1,96 @@
+/* Minimal plain CSS (plans/T4-frontend.md, CP3c). Tokens are the dataviz skill's chart chrome and status
+   palette. Verdict color is a badge behind text that always stays visible; flags (higher, lower) share one
+   color on purpose: the flag is direction-neutral. No class names: elements and [data-verdict] only. */
+:root {
+  --surface: #fcfcfb; /* also the chart's point ring */
+  --ink: #0b0b0b;
+  --muted: #52514e;
+  --line: #d5d4cf;
+  --stripe: #f3f2ee;
+  --neutral: #e9e8e3; /* normal, not_enough_history */
+  --flag: #d03b3b; /* status critical: higher, lower (surface text on it: AA) */
+  --quiet: #fab219; /* status warning: too_quiet (ink text on it: AA) */
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#root > div { max-width: 60rem; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+select, button { font: inherit; }
+section { margin: 1.25rem 0; }
+h1 { font-size: 1.25rem; margin: 0 auto 0 0; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 0 0 0.5rem; }
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+[role="alert"], [role="status"], [role="note"] {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--quiet);
+  background: var(--stripe);
+}
+[role="alert"] { border-left-color: var(--flag); }
+
+dl { margin: 0.5rem 0; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+details dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; } /* the glossary */
+
+/* Metrics as stat tiles (each dt/dd pair is wrapped in a div): small label, large value, wrapping. */
+section > dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.5rem; }
+section > dl > div { padding: 0.5rem 0.75rem; border: 1px solid var(--line); border-radius: 0.5rem; }
+section > dl dt { font-size: 0.8rem; }
+section > dl dd { font-size: 1.5rem; font-weight: 600; line-height: 1.25; }
+section > dl > div:nth-child(3) { grid-column: span 2; } /* normal range: long text, smaller value */
+section > dl > div:nth-child(3) dd { font-size: 1rem; }
+section > dl > div:nth-child(n + 6) { padding: 0.25rem 0.6rem; } /* per-type tiles: a smaller group, own row */
+section > dl > div:nth-child(n + 6) dd { font-size: 1.1rem; }
+section > dl > div:nth-child(6) { grid-column-start: 1; }
+
+/* Location detail: tiles full width, then the chart and the weeks table side by side when there is room. */
+section[aria-label="Location detail"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 0.5rem 1.5rem; }
+section[aria-label="Location detail"] > :not(figure, table) { grid-column: 1 / -1; }
+section[aria-label="Location detail"] figure { margin: 0; max-width: none; }
+small, figcaption { color: var(--muted); }
+figcaption { font-size: 0.875rem; }
+figure { margin: 1rem 0; max-width: 40rem; }
+svg { display: block; }
+summary { cursor: pointer; margin: 0.5rem 0; }
+
+table { width: 100%; margin: 0.5rem 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+caption { padding: 0.25rem 0; color: var(--muted); text-align: left; }
+th, td { padding: 0.35rem 0.6rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+thead th { background: var(--neutral); }
+tbody tr:nth-child(even) { background: var(--stripe); }
+tr[aria-current="true"] { font-weight: 700; outline: 2px solid var(--ink); outline-offset: -2px; }
+td button { padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; cursor: pointer; }
+td button[aria-current="true"] { font-weight: 700; }
+
+:is([data-verdict] strong, tr[data-verdict] td:nth-child(2) > span) {
+  display: inline-block;
+  padding: 0.05rem 0.55rem;
+  border-radius: 0.75rem;
+  background: var(--neutral);
+  color: var(--ink);
+  font-weight: 600;
+}
+:is([data-verdict="higher"], [data-verdict="lower"]) :is(strong, td:nth-child(2) > span) {
+  background: var(--flag);
+  color: var(--surface);
+}
+:is([data-verdict="too_quiet"]) :is(strong, td:nth-child(2) > span) {
+  background: var(--quiet);
+  color: var(--ink);
+}

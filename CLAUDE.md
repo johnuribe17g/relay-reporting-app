@@ -14,7 +14,7 @@ doesn't exist or I haven't approved it, stop and ask.
 - PostgreSQL 16 (docker-compose)
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2.0 (sync), Alembic, Pydantic v2 + pydantic-settings,
   psycopg 3, uv, pytest, ruff, mypy (strict)
-- Frontend (planned, T4): React + TypeScript + Vite
+- Frontend: React + TypeScript (strict) + Vite, Vitest + React Testing Library
 - Keep it simple: no async SQLAlchemy, no task queues, no extra state libraries.
 
 ## Data rules
@@ -35,10 +35,11 @@ doesn't exist or I haven't approved it, stop and ask.
 
 ## Commands
 Only Docker and make are needed. Everything runs in containers.
-- `make up`: build and start db + api (a one-shot `migrate` service applies migrations first)
+- `make up`: build and start db + api + web (a one-shot `migrate` service applies migrations first; `-V` renews web's node_modules volume)
 - `make down`: stop (keeps the DB volume). `make reset`: stop and drop the DB volume
 - `make migrate`: apply migrations. `make seed`: truncate and reload `data/seed.sql` (destructive, idempotent)
 - `make psql`: psql on the dev database. `make logs`: follow api logs
-- `make check`: the quality gate: `make lint` (ruff check + format check), `make typecheck` (mypy),
-  `make test` (pytest). Tests use their own databases (`relay_test`, `relay_migrations_test`), never the dev one
-- API: http://127.0.0.1:8000, `GET /api/health`
+- `make check`: the quality gate: `make lint` (ruff check + format check), `make typecheck` (mypy + `tsc --noEmit`),
+  `make test` (pytest + vitest; the frontend steps run in the `web` container). Tests use their own databases
+  (`relay_test`, `relay_migrations_test`), never the dev one
+- API: http://127.0.0.1:8000, `GET /api/health`. Web (Vite dev server, proxies `/api` to the API): http://127.0.0.1:5173
