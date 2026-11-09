@@ -6,6 +6,7 @@ from app.settings import settings
 from tests import db_utils
 
 TABLES = ("accounts", "activity_events")
+VIEW = "clean_events"
 EXPECTED_INDEX = "ix_activity_events_account_id_occurred_at"
 
 COLUMNS_SQL = text(
@@ -119,23 +120,30 @@ def test_constraints_do_not_reject_messy_rows(conn: Connection) -> None:
 def test_migration_round_trip(migrations_db_url: str) -> None:
     """upgrade -> downgrade base -> upgrade, in its own throwaway database."""
 
-    def existing_tables() -> set[str]:
+    def existing() -> set[str]:
+        """Names of our tables and view that currently exist."""
         engine = create_engine(migrations_db_url)
         try:
             with engine.connect() as c:
                 rows = c.execute(
-                    text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+                    text(
+                        "SELECT table_name FROM information_schema.tables "
+                        "WHERE table_schema = 'public'"
+                    )
                 )
-                return {r[0] for r in rows} & set(TABLES)
+                return {r[0] for r in rows} & {*TABLES, VIEW}
         finally:
             engine.dispose()
 
     assert db_utils.assert_test_database("relay_migrations_test")
     db_utils.upgrade(migrations_db_url)
-    assert existing_tables() == set(TABLES)
+    assert existing() == {*TABLES, VIEW}
+
+    db_utils.downgrade(migrations_db_url, "0001")  # undo 0002 only
+    assert existing() == set(TABLES)  # the view is gone, the tables remain
 
     db_utils.downgrade(migrations_db_url, "base")
-    assert existing_tables() == set()
+    assert existing() == set()
 
     db_utils.upgrade(migrations_db_url)
-    assert existing_tables() == set(TABLES)
+    assert existing() == {*TABLES, VIEW}
