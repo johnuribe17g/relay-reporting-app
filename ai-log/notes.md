@@ -79,7 +79,7 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 
   | Tool                                                                                                                  | Trigger                                                                          | Status                      |
   | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------- |
-  | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval   | T1 plan approved (it becomes the template); first use in T2                      | built at T1 close             |
+  | `/plan-ticket` command: creates the ticket branch, writes `plans/Tn-*.md` with the T1 structure, stops for approval   | T1 plan approved (it becomes the template); first use in T2                      | built at T1 close           |
   | PreToolUse hook blocking writes to `data/`                                                                            | T1 touches seed and migrations, so the CLAUDE.md rule becomes a guarantee now    | planned, in T1 plan         |
   | Hook protecting already-applied migrations                                                                            | First migration merged to main                                                   | replaced by deny rules (T1) |
   | Aggregation reviewer subagent: clean context, recomputes a few cases by hand, compares with the query/endpoint output | Baseline SQL exists (T2/T3), so the work doesn't grade itself                    | later                       |
@@ -129,3 +129,14 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   T1's plan review (contradictions between sections, tests destroying shared state)
   before stopping for approval. First use: T2, right after merging T1.
 
+## 2026-11-08 — T2 planning
+
+- My context message ended with "go ahead with /plan-ticket T2"; the agent took that as the
+  instruction and invoked the command itself. End state was correct (branch from clean main,
+  plan file only).
+- The command's step-5 self-check didn't hold up on the first pass. Asking for it explicitly
+  found problems in 4 of 5 checks: section contradictions, test IDs clashing with question IDs,
+  a missing ValueError for non-Monday weeks, and a false data claim (the "zero weeks inside the
+  baseline" for 3 locations; only Site G's is). Lesson: a self-check bundled into the same
+  generation step is weak. Run it as a separate step, or give it to the reviewer subagent.
+- Seeding the dev DB went beyond the command's allowed changes; I approved it explicitly.
