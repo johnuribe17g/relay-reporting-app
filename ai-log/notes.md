@@ -239,8 +239,7 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 - /close-ticket: 10/11 ticked by the agent. It left the reviewer item for me because I hadn't
   said I compared. I had (Site N/G by hand, B2 in psql) and ticked it with that evidence.
 - Decision log: rejected a D-24 for a field name (folded into D-16) and a D-27 for things
-  already in plan Q7/Q10. Filled the agent's TODO(john) gaps in D-24/D-25 with my actual reasons
-  instead of letting it invent them.
+  already in plan Q7/Q10.
 - T3 numbers: 274 tests, backtest 4.93 % (8 % ceiling, not tuned), reviewer ~190 values matched.
 
 ## 2026-11-09 — T4 pre-plan context
@@ -337,6 +336,9 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 - /close-ticket ticked 9 of 10. It left my browser verification unticked because I hadn't reported it in that
   session, and it flagged that it could not confirm I made two of the commits (3991b1d, dc45091) because I didn't
   say so there. Both are mine.
+- Browser check: I looked at every view in the browser during CP3b (chart, table, detail,
+  glossary) and compared account 15 Site C against curl. Tests at T4 close: backend 274,
+  frontend 90.
 - Decision log: added D-28 (presentation). No other entries: abort-by-signal and the effect dependencies are
   implementation fixes, recorded in the plan's deviations.
 
@@ -403,3 +405,27 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
   limits rather than adding a rule: numbers still come only from the server.
 - Before the run I asked for provider error messages in the log (type only would have made a 400
   undebuggable). Not needed this time; no fallback occurred.
+
+## 2026-11-09 — T6 docs and final verification
+
+- Plan review: accepted "make up, then make seed" stated plainly rather than a `make demo` target
+  (a Makefile change, and it would hide a destructive reload inside "start"). The account 6 fix
+  went into D-09 as an appended correction note, not a rewrite: the spike hits all 15 locations,
+  12 are flagged and 3 are too_quiet. The agent asked for my reason for SQLAlchemy `text()` over
+  an ORM instead of inventing one; it is now the "Data access" row of the Technical choices table.
+- D-30 and D-31 (left from the T5 close with TODO(john)): filled with my reasons. Haiku because
+  the task is short and structured and the validator, not model size, makes it safe; a cap of five
+  because the admin acts on a few locations first; completeness so the model can't hide a flagged
+  location by omission. D-31 says plainly that "why five and not four or six" isn't recorded.
+- I pasted my reflection into README.md and the Technical choices table into ai-log/README.md by
+  mistake;
+- The link check found a broken link that predates T6: ai-log/T2-aggregation-review.md was never
+  committed. The T2 reviewer run is in the 05 session export, so the entry now points there.
+- AI summary status reworded as "an early preview, not a finished feature": built so business
+  stakeholders can try the idea while evals, cost controls and monitoring are pending; behind a
+  flag, off by default; the finished part is the safety around the model.
+- Clean-clone run (mine): Timed the build together with
+  start and seed: 38 s, base images already downloaded. The README says that, and that a first
+  run also downloads the base images.
+- Time: about 9 hours in total, above the 4–6 hour guidance; recorded in the README with where
+  the extra time went.
