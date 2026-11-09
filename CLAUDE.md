@@ -10,10 +10,11 @@ Never write application code without an approved plan: PLAN.md for the overall
 feature, and plans/<ticket>.md for each ticket. If the plan for the current work
 doesn't exist or I haven't approved it, stop and ask.
 
-## Stack (planned)
+## Stack
 - PostgreSQL 16 (docker-compose)
-- Backend: Python, FastAPI, SQLAlchemy 2.0 (sync), Alembic, Pydantic v2, pytest
-- Frontend: React + TypeScript + Vite
+- Backend: Python 3.12, FastAPI, SQLAlchemy 2.0 (sync), Alembic, Pydantic v2 + pydantic-settings,
+  psycopg 3, uv, pytest, ruff, mypy (strict)
+- Frontend (planned, T4): React + TypeScript + Vite
 - Keep it simple: no async SQLAlchemy, no task queues, no extra state libraries.
 
 ## Data rules
@@ -41,4 +42,3 @@ Only Docker and make are needed. Everything runs in containers.
 - `make check`: the quality gate: `make lint` (ruff check + format check), `make typecheck` (mypy),
   `make test` (pytest). Tests use their own databases (`relay_test`, `relay_migrations_test`), never the dev one
 - API: http://127.0.0.1:8000, `GET /api/health`
-- Stack as built: Python 3.12, uv (`backend/uv.lock`), psycopg 3, mypy, ruff

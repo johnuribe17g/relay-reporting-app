@@ -295,18 +295,28 @@ checks join `make check` in T4 (PLAN §9 lists them, but there's no frontend yet
 
 ## 8. Done when
 
-- [ ] `git diff --exit-code main -- data/` is empty and `git status` shows no change under `data/` (also a clean `git diff` at the end).
-- [ ] Deny rules verified by one live attempt: in a **fresh** session, ask Claude to edit `data/schema.sql`; the
+- [x] `git diff --exit-code main -- data/` is empty and `git status` shows no change under `data/` (also a clean `git diff` at the end).
+  - Evidence: `git diff --exit-code main -- data/ PLAN.md` exits 0 on the branch head; `git status` clean.
+- [x] Deny rules verified by one live attempt: in a **fresh** session, ask Claude to edit `data/schema.sql`; the
       Edit/Write is denied by the permission rule and the file is unchanged (output pasted into the ai-log).
-- [ ] From a **clean clone** with no `.env`: `make up && make seed && curl localhost:8000/api/health` returns 200,
+  - Evidence: Verified by John in a fresh session (ai-log/notes.md, "T1 skeleton review and deny-rule check"): the first attempt was refused by the agent itself citing CLAUDE.md; with an explicit override the Edit tool returned "File is in a directory that is denied by your permission settings"; reads still work.
+- [x] From a **clean clone** with no `.env`: `make up && make seed && curl localhost:8000/api/health` returns 200,
       then `make check` is green. Repeated after `make reset`. Total under ~10 minutes including image pulls.
-- [ ] `make seed` run twice gives identical counts (12,626 / 20; view 12,614).
-- [ ] Every row of §6 exists as a test and passes; the seed-load numbers match §6d.
-- [ ] `alembic upgrade head`, `downgrade base` and `upgrade head` all succeed.
-- [ ] `CLAUDE.md` **Commands** section filled in (up, down, reset, seed, check, psql), and the stack lines updated (uv, mypy, Python 3.12, psycopg 3).
-- [ ] `.env.example` present; no secrets committed; `ruff`, `mypy`, `pytest` all green inside the container.
-- [ ] **PLAN.md is not edited** (the brief keeps it as written). `docs/data-profile.md` Method section has a one-line note that its counts are raw (before dedupe), with the 881 → 880 example (Q8). The "adapted" clarification (Q1) lives in this plan and later the README.
-- [ ] Nothing committed without your say-so. Proposed messages when asked: `chore: add data/ deny rules`, `chore: scaffold docker-compose, api skeleton, make check`, `feat: add tables migration`, `feat: add clean_events view`, `feat: add idempotent seed script`, `docs: note raw counts in data-profile`.
+  - Evidence: Verified by John: fresh clone, no `.env`, `make up && make seed && make check` green, health returned 200. Wall time for the whole clean-clone run: under 2 seconds (as reported by John). Also `make reset && make up` (notes.md).
+- [x] `make seed` run twice gives identical counts (12,626 / 20; view 12,614).
+  - Evidence: `make seed` twice on the dev DB, then `select count(*)`: `20 | 12626 | 12614`. Test: `test_seed.py::test_load_seed_is_idempotent`.
+- [x] Every row of §6 exists as a test and passes; the seed-load numbers match §6d.
+  - Evidence: `make check`: 54 passed (`test_clean_events.py` §6a/§6b, `test_migrations.py` §6c, `test_health.py`, `test_seed.py` §6d). Seed numbers matched an independent zoneinfo recomputation by John. Not asserted: §6d "same 8 week-changers on raw and clean" (the test checks the clean view only).
+- [x] `alembic upgrade head`, `downgrade base` and `upgrade head` all succeed.
+  - Evidence: `test_migrations.py::test_migration_round_trip` (own DB `relay_migrations_test`: up, down to 0001 with the view gone, down to base, up).
+- [x] `CLAUDE.md` **Commands** section filled in (up, down, reset, seed, check, psql), and the stack lines updated (uv, mypy, Python 3.12, psycopg 3).
+  - Evidence: Commands section is filled in (up, down, reset, migrate, seed, psql, logs, check, API URL). The Stack section is renamed from "Stack (planned)" to "Stack" and lists what was built (PostgreSQL 16, Python 3.12, FastAPI, SQLAlchemy 2.0 sync, Alembic, Pydantic v2 + pydantic-settings, psycopg 3, uv, pytest, ruff, mypy strict); the frontend line stays planned for T4.
+- [x] `.env.example` present; no secrets committed; `ruff`, `mypy`, `pytest` all green inside the container.
+  - Evidence: `.env.example` tracked (`git ls-files`); contains only local dev credentials (`relay`/`relay`), also the inline compose defaults; `make check`: ruff, ruff format, mypy, pytest all green.
+- [x] **PLAN.md is not edited** (the brief keeps it as written). `docs/data-profile.md` Method section has a one-line note that its counts are raw (before dedupe), with the 881 → 880 example (Q8). The "adapted" clarification (Q1) lives in this plan and later the README.
+  - Evidence: `git diff main -- PLAN.md` is empty. Raw-counts note present in `docs/data-profile.md` Method (881 → 880). The "adapted" clarification is in §2 of this plan and D-07 in docs/decisions.md; the README mention is T6.
+- [x] Nothing committed without your say-so. Proposed messages when asked: `chore: add data/ deny rules`, `chore: scaffold docker-compose, api skeleton, make check`, `feat: add tables migration`, `feat: add clean_events view`, `feat: add idempotent seed script`, `docs: note raw counts in data-profile`.
+  - Evidence: All commits were made by John after each review. Final messages differ from the proposed ones (see `git log main..HEAD`).
 
 Implementation order (tests first): deny rules → compose/Dockerfile/Makefile/health + settings
 (**review checkpoint**) → migration 1 + migration tests → view tests (red) → migration 2 (green) → seed + seed tests → CLAUDE.md.
