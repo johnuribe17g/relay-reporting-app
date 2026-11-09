@@ -1,6 +1,6 @@
 # T2: Backend core
 
-Status: **DRAFT, awaiting approval**
+Status: **APPROVED**. Q1–Q9: recommendations accepted as written.
 Source: PLAN.md §2, §3, §8 (ticket 2), §9, §10; decisions D-02, D-03, D-06, D-08; T1 plan §9 Q9. Data facts: docs/data-profile.md.
 Branch: `feat/T2-backend-core` (exists, checked out). No commits until asked.
 
@@ -371,3 +371,7 @@ LEFT JOIN clean_events e ON e.account_id = 1 AND e.location = 'Site A' AND e.loc
 SELECT count(*) FROM generate_series('2026-02-02'::date,'2026-03-16','7 days') w;   -- 7
 SELECT count(*) FROM generate_series('2026-02-02'::date,'2026-03-23','7 days') w;   -- 8
 ```
+
+## Deviations
+
+- `docker-compose.yml` (plan §3 said unchanged): the five `REPORT_*` variables are passed through the `x-api` environment with no default, so `.env` and shell overrides reach the container and defaults live only in `ReportSettings` (approved in the batch 1 review).
