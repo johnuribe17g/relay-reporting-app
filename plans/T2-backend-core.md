@@ -304,6 +304,8 @@ rechecked independently):
 | A6 | Zero-filled real series: account 6 Site G, W = 2026-07-13 | 12 prior weeks 04-20 … 07-06; 06-29 = 0, 06-01 = 57 | the series contains an explicit `0` for 06-29 |
 | A7 | All 69 locations are present at W = 2026-07-20 | profile §1, §6, §10 | 69 location series (account 6: 15), each with 13 weeks |
 | A8 | Unknown types in the seed | profile §5; T1 DQ test | `sum(unknown) == 0` over every series |
+| A9 | **Account 6 Site G, W = 2026-07-20**, location series (from the aggregation-reviewer). History `6,4,3,7,5,57,4,5,3,0,4,6`, x = 6 | sorted `0,3,3,4,4,4,5,5,6,6,7,57` → median 4.5; |dev| sorted `.5×5,1.5×4,2.5,4.5,52.5` → MAD 1.5; spread = max(2.2239, √4.5 = 2.121, 1) = 2.2239; z = 1.5/2.2239 = 0.674, d = 1.5 < 3 | `NORMAL`, z ≈ +0.674 |
+| A10 | **Account 9 Site B, W = 2026-05-04**, location series (from the aggregation-reviewer). History `11,10,8,4,8,7,9,9,9,8,14,10`, x = 3 | sorted `4,7,8,8,8,9,9,9,10,10,11,14` → median 9; |dev| sorted `0,0,0,1,1,1,1,1,2,2,5,5` → MAD 1; spread = max(1.4826, √9 = 3, 1) = 3.0; z = −6/3.0 = **−2.0 exactly**, d = −6 | `LOWER`; boundary case for the `>=` flag rule |
 
 The input series of A1 and A2 were read from the seeded dev DB with read-only queries (Appendix) and the statistics redone by hand and
 with a stdlib script; A4 is calendar arithmetic. The profile's 881 for account 6 is raw, the view gives 880. Whether the
@@ -375,3 +377,4 @@ SELECT count(*) FROM generate_series('2026-02-02'::date,'2026-03-23','7 days') w
 ## Deviations
 
 - `docker-compose.yml` (plan §3 said unchanged): the five `REPORT_*` variables are passed through the `x-api` environment with no default, so `.env` and shell overrides reach the container and defaults live only in `ReportSettings` (approved in the batch 1 review).
+- A9, A10 added from the aggregation-reviewer's independent cases.

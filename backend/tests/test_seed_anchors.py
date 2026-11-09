@@ -1,4 +1,4 @@
-"""Seed anchors A1-A8 (plans/T2-backend-core.md §2g): the real data through series + judge.
+"""Seed anchors A1-A10 (plans/T2-backend-core.md §2g): the real data through series + judge.
 
 A separate module on purpose: the module-scoped `seeded_conn` holds the seed's TRUNCATE locks
 (ACCESS EXCLUSIVE) until it rolls back, so no test using the function-scoped `conn` may share
@@ -135,3 +135,35 @@ def test_a8_seed_has_no_unknown_event_types(seeded_conn: Connection) -> None:
         result = fetch_series(seeded_conn, account_id, date(2026, 7, 20), FIRST, 12)
         for series in result.locations:
             assert sum(w.unknown for w in series.weeks) == 0, (account_id, series.key)
+
+
+def test_a9_zero_week_in_location_baseline_is_normal(seeded_conn: Connection) -> None:
+    site_g = location_series(seeded_conn, 6, "Site G", date(2026, 7, 20))
+    history, x = history_and_x(site_g)
+    assert history == [6, 4, 3, 7, 5, 57, 4, 5, 3, 0, 4, 6]
+    assert x == 6
+    judgement = judge(history, x, PARAMS)
+    assert judgement.verdict is Verdict.NORMAL
+    assert judgement.baseline is not None
+    assert judgement.baseline.weeks_used == 12
+    assert judgement.baseline.median == 4.5
+    assert judgement.baseline.mad == 1.5
+    assert judgement.baseline.spread == pytest.approx(2.2239, rel=1e-4)
+    assert judgement.diff == 1.5
+    assert judgement.z == pytest.approx(0.674, rel=1e-3)
+
+
+def test_a10_real_data_boundary_z_exactly_minus_two_is_lower(seeded_conn: Connection) -> None:
+    site_b = location_series(seeded_conn, 9, "Site B", date(2026, 5, 4))
+    history, x = history_and_x(site_b)
+    assert history == [11, 10, 8, 4, 8, 7, 9, 9, 9, 8, 14, 10]
+    assert x == 3
+    judgement = judge(history, x, PARAMS)
+    assert judgement.verdict is Verdict.LOWER
+    assert judgement.baseline is not None
+    assert judgement.baseline.weeks_used == 12
+    assert judgement.baseline.median == 9
+    assert judgement.baseline.mad == 1
+    assert judgement.baseline.spread == 3.0
+    assert judgement.diff == -6
+    assert judgement.z == -2.0
