@@ -87,3 +87,17 @@ First instance: CLAUDE.md, motivated by the timezone conversion mistake in sessi
 
 - Not building tooling upfront on purpose: a command derived from a plan that already
   worked is better than one designed in the abstract.
+
+## 2026-11-08 — T1 skeleton review and deny-rule check
+
+- Ran `make reset && make up`, the health check and `make check` on my machine: all green.
+- Dropped the custom hook script the agent planned (Python script + ~12 unit tests) for
+  native `permissions.deny` rules: too much for the time budget, given the ro mount and
+  the `git diff` check already exist.
+- Tested the deny rules in a fresh session. First attempt: the agent refused on its own,
+  citing CLAUDE.md, so the permission layer was never exercised. Second attempt, with
+  an explicit override: the Edit tool returned "File is in a directory that is denied by
+  your permission settings". Reads still work. Two separate layers: the instruction the
+  agent chooses to follow, and the rule the harness enforces.
+- Asked the agent to lint migrations (it had excluded migrations/versions from ruff) and
+  to publish the api port on 127.0.0.1 only.
