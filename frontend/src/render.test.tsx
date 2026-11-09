@@ -286,7 +286,43 @@ describe("location detail (plan §2f, CP3a)", () => {
     const last = data[12] as HTMLElement;
     expect(cells(last)[5]).toBe("Selected week");
     expect(last).toHaveAttribute("data-role", "selected");
-    expect(region.textContent).toContain("the selected week's");
+    // the chart note of the plan: the band is the selected week's (the caption under the chart)
+    expect(region.textContent).toContain(
+      "Shaded: normal range for the selected week (0.8 to 10.2). Earlier weeks are shown for context and are not judged against it.",
+    );
+  });
+
+  test("R13 the chart: 13 points, the selected one is the last, one band, a caption", () => {
+    // 13 points: the same window arithmetic as R11 (12 baseline weeks 04-27 .. 07-13 + the selected 07-20).
+    // Site C: totals max 12 > band high 10.19, so yMax = 12 and the Y labels are 0 and 12.
+    const region = detail(cloneHistory(a15History));
+    const svg = within(region).getByRole("img", {
+      name: /Site C.*13 weeks.*selected week 2026-07-20 total 12.*normal range 0\.8 to 10\.2/,
+    });
+    const points = Array.from(svg.querySelectorAll("circle[data-role]"));
+    expect(points).toHaveLength(13);
+    const selected = points.filter((p) => p.getAttribute("data-role") === "selected");
+    expect(selected).toHaveLength(1);
+    expect(points[12]).toBe(selected[0]);
+    expect(points.slice(0, 12).every((p) => p.getAttribute("data-role") === "baseline")).toBe(true);
+    expect(Number(selected[0]?.getAttribute("r"))).toBeGreaterThan(Number(points[0]?.getAttribute("r")));
+    expect(svg.querySelectorAll('rect[data-chart="band"]')).toHaveLength(1);
+    const labels = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["0", "12", "2026-04-27", "2026-07-20"]));
+    expect(labels.filter((t) => t === "12")).toHaveLength(2); // the Y maximum and the selected total
+    expect(within(region).getByRole("table", { name: "Weekly totals" })).toBeInTheDocument();
+  });
+
+  test("R15 a history with no baseline (not judged) has no chart, only the table", () => {
+    const history = cloneHistory(a15History);
+    history.verdict = "not_enough_history";
+    history.z = null;
+    history.diff = null;
+    history.baseline = null;
+    const region = detail(history, 5);
+    expect(region.querySelector("svg")).toBeNull();
+    expect(within(region).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(region).getByRole("table", { name: "Weekly totals" })).toBeInTheDocument();
   });
 
   test("R17 the detail's not_enough_history reason uses the report row's history_weeks", () => {

@@ -3,6 +3,7 @@ import { baselineSentence, fmtBand, fmtDiff, fmtNum, fmtZ, reasonText, verdictLa
 import type { AsyncState } from "../hooks/useAsync";
 import { DataQualityWarning } from "./DataQualityWarning";
 import { ErrorBox } from "./ErrorBox";
+import { WeekChart } from "./WeekChart";
 import { WeeksTable } from "./WeeksTable";
 
 /**
@@ -55,10 +56,8 @@ export function LocationDetail({
       {data.data_quality.unknown_events_in_window > 0 && (
         <DataQualityWarning count={data.data_quality.unknown_events_in_window} />
       )}
+      <WeekChart data={data} />
       <WeeksTable weeks={data.weeks} />
-      <p>
-        The normal range shown is the selected week&apos;s; earlier weeks are not judged against it here.
-      </p>
     </section>
   );
 }
