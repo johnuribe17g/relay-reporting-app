@@ -17,6 +17,7 @@ decide anything. Decisions belong in PLAN.md.
 
 - Throwaway `postgres:16` container (`docker run --rm`, port 127.0.0.1:5433, no volume, nothing committed).
   `data/schema.sql` then `data/seed.sql` loaded unmodified with `ON_ERROR_STOP`. `git status` stayed clean.
+- **Counts are raw (before the 12 exact duplicates are removed).** The `clean_events` view gives slightly lower numbers, e.g. account 6's spike week is 881 here but 880 after dedupe (§7, §11).
 - All queries are read-only (temp tables only). Queries below are the ones that produced the numbers; long
   ones are trimmed to the essential shape.
 - **Local time conversion** (`occurred_at` is `TIMESTAMP` without tz, stored as UTC):
